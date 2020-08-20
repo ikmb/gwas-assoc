@@ -28,7 +28,7 @@ anno = fileExists(file(params.anno))
 // defaults
 params.collection_name = "dataset"
 // params.nxfdir = "/home/sukmb388/nextflow-staging"
-params.nxfdir = "${work.projectDir}"
+params.nxfdir = "${workflow.projectDir}"
 params.output = "."
 params.more_covars = ""
 params.liftover = 0
