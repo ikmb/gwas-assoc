@@ -781,7 +781,6 @@ done
 #REAL_COVARS=$(readlink -f {in_covars})
 #COVAR_TIME=$(stat -c %y $REAL_COVARS)
 
-NOW=!{params.now}$(date +%Y%m%d-%H%M%S)
 echo Collection name: !{params.collection_name}
 #echo Covariates source: $REAL_COVARS >meta
 #echo Last modified: $COVAR_TIME >>meta
@@ -794,8 +793,8 @@ else
 fi
 echo Null model calibration filter: !{params.null_filter} >>meta
 
-mv !{params.collection_name}.SAIGE.stats !{params.collection_name}.SAIGE.$NOW.stats
-mv meta !{params.collection_name}.SAIGE.$NOW.stats.txt
+mv !{params.collection_name}.SAIGE.stats !{params.collection_name}.SAIGE.stats
+mv meta !{params.collection_name}.SAIGE.stats.txt
 '''
 }
 
