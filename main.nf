@@ -180,54 +180,6 @@ rm -f $FIFO
 '''
 }
 
-process plink_assoc {
-
-input:
-tuple file(gz), file(map), val(chrom) from for_plink_assoc
-file inc_fam
-file covars from for_plink_covars
-
-output:
-tuple file("${params.collection_name}.${chrom}.assoc.dosage"), file("${params.collection_name}.${chrom}.log") for_merge_dosage
-
-shell:
-'''
-module load Plink/1.9
-
-mawk '{ $1 = $2; print $0 }' !{inc_fam} >pcs.txt
-head -n 1 !{covars} >pcs.txt
-tail -n +2 | mawk '{print $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12}' >>pcs.txt
-
-plink --fam !{inc_fam} --map !{map} \\
-      --dosage !{gz} skip0=2 skip1=0 skip2=1 format=3 case-control-freqs \\
-      --covar pcs.txt --covar-name PC1-PC10 \\
-      --allow-no-sex --ci 0.95 \\
-      --out !{params.collection_name}.!{chrom}
-'''
-}
-
-process merge_plink_stats {
-input:
-tuple file(dosage), file(log) from for_merge_dosage.collect()
-
-output:
-file("${params.collection_name}.plink.stats")
-
-shell:
-'''
-cat !{params.collection_name}.!{chrom}.assoc.dosage >!{params.collection_name}.dosage
-for (( i=2; i<=25; i++ ))
-do
-    if [ -e !{params.collection_name}.$i.assoc.dosage ]; then
-        tail -n +2 !{params.collection_name}.$i.assoc.dosage >>!{params.collection_name}.dosage
-    fi
-done
-
-mawk '{ if($8 >= 0.6) print }' !{params.collection_name}.dosage >!{params.collection_name}.dosage.RSQ0.6
-
-'''
-
-}
 
 /* Prepare a list of r2-filtered variants for SAIGE step1 model generation */
 process gen_r2_list {
@@ -838,4 +790,54 @@ echo "Lifted from hg38 to hg19. Liftover protocol: " >>new-meta
 stats2hg19.pl !{lifttable} !{sumstats} >>new-meta
 mv new-meta !{sumstats}.b37.txt
 '''
+}
+
+
+process plink_assoc {
+
+input:
+tuple file(gz), file(map), val(chrom) from for_plink_assoc
+file inc_fam
+file covars from for_plink_covars
+
+output:
+tuple file("${params.collection_name}.${chrom}.assoc.dosage"), file("${params.collection_name}.${chrom}.log") for_merge_dosage
+
+shell:
+'''
+module load Plink/1.9
+
+mawk '{ $1 = $2; print $0 }' !{inc_fam} >pcs.txt
+head -n 1 !{covars} >pcs.txt
+tail -n +2 | mawk '{print $2, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12}' >>pcs.txt
+
+plink --fam !{inc_fam} --map !{map} \\
+      --dosage !{gz} skip0=2 skip1=0 skip2=1 format=3 case-control-freqs \\
+      --covar pcs.txt --covar-name PC1-PC10 \\
+      --allow-no-sex --ci 0.95 \\
+      --out !{params.collection_name}.!{chrom}
+'''
+}
+
+process merge_plink_stats {
+input:
+tuple file(dosage), file(log) from for_merge_dosage.collect()
+
+output:
+file("${params.collection_name}.plink.stats")
+
+shell:
+'''
+cat !{params.collection_name}.!{chrom}.assoc.dosage >!{params.collection_name}.dosage
+for (( i=2; i<=25; i++ ))
+do
+    if [ -e !{params.collection_name}.$i.assoc.dosage ]; then
+        tail -n +2 !{params.collection_name}.$i.assoc.dosage >>!{params.collection_name}.dosage
+    fi
+done
+
+mawk '{ if($8 >= 0.6) print }' !{params.collection_name}.dosage >!{params.collection_name}.dosage.RSQ0.6
+
+'''
+
 }
