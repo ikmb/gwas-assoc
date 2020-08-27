@@ -1,33 +1,40 @@
 
 
 params.collection_name = "collection_name"
-params.output = "."
+params.output = "output"
 params.more_covars = "."
+params.more_covars_cols = ""
 params.liftover = 0
 
-params.chrchr = 1
+params.chrchr = 0 // should not be used anymore
+
 params.null_filter = "R2>0.8"
+
+inc_fam = file(params.fam)
 
 def get_file_details(filename) {
     def m = filename =~ /\/([^\/]+)(\.vcf\.gz|\.bgen)$/
-    println filename
     return [ m[0][1], m[0][2] ]
 }
 
-for_saige_imp = Channel.fromPath(params.input_imputed_glob, checkIfExists: true).map { it -> 
-    def match = get_file_details(it)
-    [it, match[0], match[1]] }
-
-
-// does not really do anything besides pulling a docker container into the
-// local cache that will be needed for saige.
-// The saige pipeline master will be run on a compute node and might not
-// have internet access for pulling from the docker registry.
-process get_containers {
-    container "docker://wzhou88/saige:0.38"
-output:
-    val("ok") into for_saige_gate
+def get_chromosome_code(filename) {
+    def m = filename =~ /\/([^\/]+).filtered.vcf.gz$/
+    return m[0][1]
 }
+
+for_saige_imp = Channel.fromPath(params.input_imputed_glob, checkIfExists: true).map { it ->
+    def match = get_file_details(it)
+    [it, match[1]] }
+
+for_saige_null_covars = Channel.create()
+for_merge_sumstats_covars = Channel.create()
+
+
+for_split_vcf = Channel.create()
+for_extract_dosage = Channel.create()
+for_gen_r2 = Channel.create()
+for_plink_imp = Channel.create()
+
 
 // prefilter
 // ---------
@@ -36,16 +43,16 @@ output:
 // - filters samples according to the FAM file given via --fam.
 // Creates new VCF/GZ sets.
 process prefilter {
-    tag "${params.collection_name}.${chrom}"
-//    publishDir params.output, mode: 'copy'
-    time {48.h * task.attempt}
+    tag "${params.collection_name}"
+    label "bigmem"
+    label "longrunning"
     cpus 4
     input:
-    tuple file(vcf), val(chrom), val(filetype) from for_saige_imp
+    tuple file(vcf), val(filetype) from for_saige_imp
     file inc_fam
 
     output:
-    tuple file("${chrom}.filtered.vcf.gz"), file("${chrom}.filtered.vcf.gz.tbi"), val(chrom), val(filetype) into for_saige, for_extract_dosage, for_gen_r2, for_plink_imp
+    tuple file("*.filtered.vcf.gz"), file("*.filtered.vcf.gz.tbi"), val(filetype) into for_extract_chromosome_code //for_split_vcf, for_extract_dosage, for_gen_r2, for_plink_imp
 
 shell:
 '''
@@ -61,18 +68,23 @@ comm -12 vcf-samples fam-samples >keep-samples
 # Count those that we ought to remove
 REMOVE_COUNT=$(comm -23 vcf-samples fam-samples | wc -l)
 
+bcftools query -f '%CHROM\\n' !{vcf} | head -n1 >chrom
+CHROM=$(cat chrom)
+
 # Ok, we need to remove some samples. tabix afterwards
 # If there's nothing to remove, skip this time-consuming step.
 if [ "$REMOVE_COUNT" != "0" ]; then
-    bcftools view --threads 4 -S keep-samples !{vcf} -o !{chrom}.filtered.vcf.gz -O z
-    tabix !{chrom}.filtered.vcf.gz
+    bcftools view --threads 4 -S keep-samples !{vcf} -o $CHROM.filtered.vcf.gz -O z
+    tabix $CHROM.filtered.vcf.gz
 else
-    ln -s !{vcf} !{chrom}.filtered.vcf.gz
-    ln -s !{vcf}.tbi !{chrom}.filtered.vcf.gz.tbi
+    ln -s !{vcf} $CHROM.filtered.vcf.gz
+    ln -s !{vcf}.tbi $CHROM.filtered.vcf.gz.tbi
 fi
 
 '''
 }
+
+for_extract_chromosome_code.map { it -> [it[0], it[1], get_chromosome_code(it[0]), it[2]] }.into { for_split_vcf; for_extract_dosage; for_gen_r2; for_plink_imp }
 
 /* Prepare a list of r2-filtered variants for SAIGE step1 model generation */
 process gen_r2_list {
@@ -85,12 +97,21 @@ process gen_r2_list {
 
 shell:
 '''
+set +e
 bcftools query -i'!{params.null_filter}' -f '%CHROM:%POS:%REF:%ALT\\n' !{vcf} >r2-include.!{chrom}
+
+if [ $? -ne 0 ]; then
+    echo Filter not found or genotyped-only data available.
+    bcftools query -f '%CHROM:%POS:%REF:%ALT\\n' !{vcf} >r2-include.!{chrom}
+fi
+
+exit 0
+
 '''
 }
 
 process merge_r2 {
-    tag "${params.collection_name}.${chrom}"
+    tag "${params.collection_name}"
     input:
     file r2 from for_prune_r2.collect()
 
@@ -102,11 +123,11 @@ shell:
 cat r2-include.* >r2-include
 
 # Check if "chr" prefix is used in VCFs. If not, prefix the r2 list now
-if [ "!{params.chrchr}" = "0" ]; then
-    mawk '{print "chr"$0}' r2-include | sort >r2-include.sorted
-else
+#if [ "!{params.chrchr}" = "0" ]; then
+#    mawk '{print "chr"$0}' r2-include | sort >r2-include.sorted
+#else
     sort r2-include >r2-include.sorted
-fi
+#fi
 '''
 }
 
@@ -114,7 +135,7 @@ fi
    phenotype and sex columns from QC FAM file. */
 process make_plink {
 //    publishDir params.output, mode: 'copy'
-    memory 50.GB
+    label "bigmem"
     tag "${params.collection_name}.$chrom"
 
     input:
@@ -134,62 +155,245 @@ mawk '{$2=$1":"$4":"$6":"$5; print $0}' <bim >!{params.collection_name}.!{chrom}
 '''
 }
 
-
-/* Prune b38 for SAIGE null model */
-process prune {
+process merge_plink {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    memory 60000
+    memory 64000
+    cpus 4
+    time {8.h * task.attempt}
+    input:
+    file(filelist) from for_merge_b38.collect()
+
+    output:
+    tuple file("${params.collection_name}.bed"), file("${params.collection_name}.bim"), file("${params.collection_name}.fam"), file("${params.collection_name}.log") into for_prune
+
+
+    shell:
+'''
+ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
+FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | head -n1)
+module load Plink/1.9
+plink --bfile $FIRSTNAME --threads 4 --memory 60000 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
+mv !{params.collection_name}.bim tmp
+mawk '{$2=$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}.bim
+'''
+}
+
+
+process prune {
+    tag "${params.collection_name}"
+    label "big_mem"
     cpus 4
     input:
-    tuple file(bed), file(bim), file(fam), file(logfile), val (chrom) from for_prune
+    tuple file(bed), file(bim), file(fam), file(logfile) from for_prune
     file r2 from for_prune_merged
 
     output:
-    tuple file("${params.collection_name}.pruned.${chrom}.bed"), file("${params.collection_name}.pruned.${chrom}.bim"), file("${params.collection_name}.pruned.${chrom}.fam"), file("${params.collection_name}.pruned.${chrom}.log") into for_saige_null, for_liftover_pruned, for_generate_pcs
+    tuple file("${params.collection_name}.pruned.bed"), file("${params.collection_name}.pruned.bim"), file("${params.collection_name}.pruned.fam"), file("${params.collection_name}.pruned.log") into for_saige_null, for_liftover_pruned, for_generate_pcs
 
 shell:
 '''
 module load Plink/1.9
 echo Generating PCA SNP List file for variant selection
 
-/opt/plink2 --memory 60000 --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract !{r2} --indep-pairwise 50 5 0.2 --out _prune
+R2=!{r2}
+
+if [ ! -s $R2 ]; then
+    # No entries in include list. This means that either we have genotyped-only
+    # data where no R2 score is present or the filter is malformed. We're assuming
+    # genotyped-only data here. In this case, populate the r2 list.
+    cut -f2 -d" " !{bim} | sort >new-r2
+    R2=new-r2
+fi
+
+
+/opt/plink2 --memory 60000 --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract $R2 --indep-pairwise 50 5 0.2 --out _prune
 /opt/plink2 --memory 60000 --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract _prune.prune.in --maf 0.05 --make-bed --out intermediate
 
 python -c 'from SampleQCI_helpers import *; write_snps_autosomes_noLDRegions_noATandGC_noIndels("!{bim}", "include_variants")'
 sort include_variants >include_variants.sorted
 
-comm -12 include_variants.sorted !{r2} >include-r2-variants
+comm -12 include_variants.sorted $R2 >include-r2-variants
 /opt/plink2 --memory 60000 --threads 4 --bfile intermediate --chr 1-22 --extract include-r2-variants --output-chr chrM --make-bed --out !{params.collection_name}.pruned
 rm intermediate*
 
 '''
-
-
 }
 
-process saige {
+process generate_pcs {
+    cpus 16
     tag "${params.collection_name}"
+    label "bigmem"
+
+input:
+    tuple file(bed), file(bim), file(fam), file(log) from for_generate_pcs
+
+output:
+    file "pcs.txt" into for_saige_covars
+
+shell:
+'''
+module load FlashPCA
+flashpca2 -d 10 --bfile !{bim.baseName} --numthreads 16 --outload loadings.txt --outmeansd meansd.txt
+
+'''
+}
+
+
+/* Create a SAIGE null model from b38 Plink build and PCs */
+process saige_null {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+    container "docker://wzhou88/saige:0.38"
+    cpus 16
+    time {2.d * task.attempt}
 
     input:
-    tuple file(gz), file(tbi), val(chrom), val(filetype) from for_saige.collect()
+    tuple file(bed), file(bim), file(fam), file(logfile) from for_saige_null
+    tuple file(pheno), file(covar_list) from for_saige_null_covars
 
-    // wait for process to acquire container needed for SAIGE, just in case
-    // the compute nodes, where process saige could be spawned, does not have
-    // access to the docker registry
-    val container_ok from for_saige_gate
-    
+    output:
+    tuple file("${params.collection_name}.rda"), file("${params.collection_name}.varianceRatio.txt") into for_saige_assoc, nulldump
+
+shell:
+    '''
+
+sed 's/^chr//' !{bim.baseName}.bim >tmp.bim
+ln -s !{bed} tmp.bed
+ln -s !{fam} tmp.fam
+
+step1_fitNULLGLMM.R \
+    --plinkFile=tmp \
+    --phenoFile=!{pheno} \
+    --phenoCol=Pheno \
+    --covarColList=$(cat !{covar_list}) \
+    --sampleIDColinphenoFile=IID \
+    --traitType=binary        \
+    --outputPrefix=!{params.collection_name} \
+    --nThreads=16 \
+    --LOCO=FALSE
+    '''
+}
+
+
+params.saige_chunk_size = 50
+//params.saige_chunk_size = 20000
+
+process split_vcf_ranges {
+    tag "${params.collection_name}.${chrom}"
+    input:
+    tuple file(vcf), file(tbi), val(chrom), val(filetype) from for_split_vcf
+    output:
+    tuple file(vcf), file(tbi), val(chrom), val(filetype), file("0*") into for_saige_assoc_imp, testdump
+
+    shell:
+    '''
+    bcftools query -f "%POS\\n" !{vcf} >positions
+    bcftools view -H !{vcf} | head -n1 | cut -f9 >field
+    split -d --suffix-length=8 --lines=!{params.saige_chunk_size} positions '0'
+    '''
+}
+
+
+
+testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2], it[3], it[4], it[5][0], it [5][1] ] }.set{ saige_jobs }
+
+/* Perform SAIGE Assoc test on imputed VCFs */
+process saige_assoc {
+    tag "${params.collection_name}.${chrom}.${chunk}"
+    container "docker://wzhou88/saige:0.38"
+    time {2.h * task.attempt}
+    input:
+    // <-- single VCF and chromosome number
+//    tuple file(vcf), file(tbi), val(chrom), val(filetype),file(chunk) from for_saige_assoc_imp.transpose() // turn [chr1, [chunk1, chunk2, chunk3]] into [chr1, chunk1], [chr1, chunk2], [chr1, chunk3]
+//    tuple file(modelfile), file(varratio) from for_saige_assoc
+    tuple file(vcf), file(tbi), val(chrom), val(filetype), file(chunk), file(modelfile), file(varratio) from saige_jobs
+
+    output:
+    file("${chrom}.${chunk.name}.SAIGE.stats") into for_merge_sumstats
+
+shell:
+field = "GT"
+'''
+FIRSTPOS=$(head -n1 <!{chunk})
+LASTPOS=$(tail -n1 <!{chunk})
+
+#if [ "!{params.chrchr}" = "0" ]; then
+    CHR=!{chrom}
+#else
+#    CHR=chr!{chrom}
+#fi
+
+FIELD="DS"
+AVAILABLE="GT"
+
+if [[ ! $AVAILABLE =~ "DS" ]]; then
+    if [[ ! $AVAILABLE =~ "GT" ]]; then
+        echo "Error: Neither dosage nor genotypes are present in the VCF files." >/dev/stderr
+        exit 1
+    else
+        FIELD="GT"
+    fi
+fi
+
+
+step2_SPAtests.R \
+    --vcfFile="!{vcf}" \
+    --vcfFileIndex="!{tbi}" \
+    --vcfField=$FIELD \
+    --chrom=$CHR \
+    --minMAF=0.001 \
+    --minMAC=1 \
+    --GMMATmodelFile="!{modelfile}" \
+    --varianceRatioFile="!{varratio}" \
+    --SAIGEOutputFile=temp.stats \
+    --numLinesOutput=2 \
+    --start=$FIRSTPOS \
+    --end=$LASTPOS \
+    --IsOutputAFinCaseCtrl=TRUE \
+    --IsOutputNinCaseCtrl=TRUE \
+    --IsOutputHetHomCountsinCaseCtrl=TRUE
+
+# add odds ratio
+<temp.stats mawk 'NR==1{print $0 " OR";next} {print $0 " " exp($10)}' \
+    >"!{chrom}.!{chunk.name}.SAIGE.stats"
+'''
+}
+
+
+//for_merge_sumstats.collect().dump()
+
+process merge_saige_results {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+    input:
+    file(sumstats) from for_merge_sumstats.collect()
+    tuple file(pheno), file(cols) from for_merge_sumstats_covars
+//    file in_covars
+
+
+    output:
+    file("${params.collection_name}.SAIGE.stats") into for_lift_sumstats_sumstats
 shell:
 '''
 
+ls -1 *.*.stats | sort -n >allfiles
+
+
+head -n1 !{sumstats[0]} >!{params.collection_name}.SAIGE.stats
+while read -r line; do
+    tail -n +2 $line >>!{params.collection_name}.SAIGE.stats
+done <allfiles
+
 '''
 }
+
 
 process extract_dosage {
     tag "${params.collection_name}.${chrom}"
 
     input:
-    tuple file (gz), file(tbi), val(chrom), val(filetype)
+    tuple file (gz), file(tbi), val(chrom), val(filetype) from for_extract_dosage
 
     output:
     tuple file("${chrom}.PLINKdosage.map"), file("${chrom}.PLINKdosage.gz"), val(chrom) into for_plink
@@ -198,7 +402,7 @@ shell:
 '''
 
 VCF=!{gz}
-TARGET=$(basename $VCF .vcf.gz).PLINKdosage
+TARGET=!{chrom}.PLINKdosage
 
 # Theoratically, gawk or awk would also work but are much slower
 AWK=mawk
@@ -219,13 +423,16 @@ BEGIN{
     } else {
         # Copy header line
         if (($1 ~ /^#CHROM/)) {
+            # Process one FID_IID-part into "0 FID_IID", so Plink thinks there
+            # are really two values
             for (i=10; i<=NF; i++)
-                printf " "$i" "$i
-            printf "\n"
+                printf " "0" "$i
+            printf "\\n"
         } else {
             # Extract r^2 score from INFO field
             {
-                split($8, fields, /(;|=)/)
+                n = split($8, fields, /(;|=)/)
+                info = "R2=1.0" # default to 1 if no usable info score is found
                 for(i=1; i in fields; i++) {
                     if(fields[i] == "INFO" || fields[i] == "DR2" || fields[i] == "R2") {
                             info = fields[i+1]
@@ -234,23 +441,41 @@ BEGIN{
                 }
             }
 
+            # keep a dictionary of variants to skip duplicates
             if(!schonmalgesehen[$1":"$2":"$4":"$5]) {
                 printf $1" "$2" "$1":"$2":"$4":"$5" "$4" "$5" "info
+
+                # split value field
                 for (i=10; i<=NF; i++) {
-                    split($i,array,":")
-                    # Missing fields are specified as ".", not splittable by ","
-                    if(array[4] == ".") {
-                        printf " . . ."
-                    } else {
-                        n=split(array[4],array_GP,",")
-                        if(n==3) {
-                            printf " "array_GP[1]" "array_GP[2]" "array_GP[3]
+                    n=split($i,array,":")
+                    # no :-separated field? Must be GT only, straight from plink
+                    if(n==1) {
+                        n=split($i,array,"/")
+                        if(n==2) {
+                            # "convert" hard calls to probabilities
+                            if($i=="0/0") { printf " 1 0 0" }
+                            else if($i=="1/0" || $i=="0/1") { printf " 0 1 0" }
+                            else { printf " 0 0 1" }
                         } else {
-                            printf " "array_GP[1]" 0 "array_GP[2]
-                    }
+                            print "VCF Error: GP or GT field not present or malformatted" >/dev/stderr
+                            exit 1
+                        }
+                    } else {
+                        # Missing fields are specified as ".", not splittable by ","
+                        if(array[4] == ".") {
+                            printf " . . ."
+                        } else {
+                            n=split(array[4],array_GP,",")
+                            if(n==3) {
+                                printf " "array_GP[1]" "array_GP[2]" "array_GP[3]
+                            } else {
+                                printf " "array_GP[1]" 0 "array_GP[2]
+                            }
+                        }
                     }
                 }
-                printf "\n"
+
+                printf "\\n"
 
                 schonmalgesehen[$1":"$2":"$4":"$5] = 1
             }
@@ -260,10 +485,9 @@ BEGIN{
 }
 AwkProg2
 
-
 (<$FIFO tail -n +2 | $AWK '{print $1, $3, 0, $2}' | uniq) >$TARGET.map &
 
-
+# unpack vcf.gz only once
 $BGZIP -c -d $VCF \
     | $AWK -f awkprog2.awk \
     | tee $FIFO \
@@ -275,15 +499,111 @@ rm -f $FIFO
 '''
 }
 
-process plink {
-    tag "${params.collection_name}"
+
+
+/* Create SAIGE-compatible covars from PCA eigenvectors */
+process make_saige_covars {
+
+    publishDir params.output, mode: 'copy'
+
+    input:
+    // file in_covars
+    file (evec) from for_saige_covars
+
+    file inc_fam
+
+    output:
+    tuple file("${params.collection_name}.covars"), file("${params.collection_name}.covar_cols") into for_saige_null_covars, for_merge_sumstats_covars, for_plink_covars
+    file "${params.collection_name}.double-id.fam" into for_plink_fam
+
+    shell:
+'''
+# Re-format sample ID and family ID to VCF rules
+mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{inc_fam}  | sort >new-fam
+
+# Also re-format, but keep evec header
+# mawk 'NR==1{print $0;next} {if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' {in_covars}  | sort >evec
+
+# Take evec file as a whole, SAIGE does not care about additional columns.
+# Filter evec file according to samples contained in FAM (if not already done)
+
+mawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(12);i++) {printf "%s%s", $i, (i<12?OFS:ORS)}}}' new-fam !{evec} >filtered-evec
+
+if [ -f "!{params.more_covars}" ]; then
+    mawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(6);i++) {printf "%s%s", $i, (i<6?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
+    cut -f3-6 !{params.more_covars} >covars-column
+    < filtered-covars cut -f3-6 -d" " >>covars-column
+fi
+
+EVEC_LINES=$(wc -l <filtered-evec)
+FAM_LINES=$(wc -l <new-fam)
+if [ $EVEC_LINES -ne $FAM_LINES ]; then
+    echo I could not find covariates in !{evec} for every sample specified in !{inc_fam}. Please check.
+    echo Aborting.
+    exit 1
+fi
+
+echo "FID IID PC1 PC2 PC3 PC4 PC5 PC6 PC7 PC8 PC9 PC10" >evec.double-id.withheader
+cat filtered-evec >>evec.double-id.withheader
+
+# Take phenotype info from FAM, translate to SAIGE-encoding
+echo "Pheno" >pheno-column
+<new-fam  mawk '{if($6=="2") {$6="1";} else if($6=="1") {$6="0";} print $6}' >>pheno-column
+
+mv new-fam !{params.collection_name}.double-id.fam
+
+# Merge both, replace space runs with single tabs for SAIGE
+touch covars-column
+if [ -f "!{params.more_covars}" ]; then
+    echo PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC6,PC7,PC8,PC9,PC10,!{params.more_covars_cols} >!{params.collection_name}.covar_cols
+else
+    echo PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC6,PC7,PC8,PC9,PC10 >!{params.collection_name}.covar_cols
+
+fi
+
+paste -d" " evec.double-id.withheader pheno-column covars-column | tr -s ' ' \\\\t >!{params.collection_name}.covars
+
+'''
+}
+
+
+process plink_assoc {
+    tag "${params.collection_name}.${chrom}"
 
     input:
     tuple file(dosagemap), file(dosage), val(chrom) from for_plink
-    file inc_fam
+    tuple file(pheno), file(cols) from for_plink_covars
+    file fam from for_plink_fam
+
+    output:
+    file "${chrom}.assoc.dosage" into for_plink_results
 
 shell:
 '''
+module load Plink/1.9
 
+plink --fam !{fam} --map !{dosagemap} --dosage !{dosage} skip0=2 skip1=0 skip2=1 format=3 case-control-freqs \\
+    --covar !{pheno} --covar-name PC1-PC10 \\
+    --allow-no-sex --ci 0.95 \\
+    --out !{chrom}
+
+'''
+}
+
+process merge_plink_results {
+    tag "${params.collection_name}"
+
+    publishDir params.output, mode: 'copy'
+    input:
+    file(stats) from for_plink_results.collect()
+
+    output:
+    file "${params.collection_name}.Plink.stats"
+
+shell:
+'''
+head -n1 !{stats[0]} >!{params.collection_name}.Plink.stats
+
+ls !{stats} | sort -n | xargs -n1 tail -n +2 >>!{params.collection_name}.Plink.stats
 '''
 }
