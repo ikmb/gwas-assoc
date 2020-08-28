@@ -150,8 +150,8 @@ shell:
 # Generate double-id FAM
 mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
 /opt/plink2 --vcf !{vcf} --const-fid --memory 46000 --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
-mv !{params.collection_name}.!{chrom}.bim bim
-mawk '{$2=$1":"$4":"$6":"$5; print $0}' <bim >!{params.collection_name}.!{chrom}.bim
+
+# Might need some "chr" prefixing here
 '''
 }
 
@@ -174,8 +174,8 @@ ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
 FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | head -n1)
 module load Plink/1.9
 plink --bfile $FIRSTNAME --threads 4 --memory 60000 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
-mv !{params.collection_name}.bim tmp
-mawk '{$2=$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}.bim
+#mv !{params.collection_name}.bim tmp
+#mawk '{$2=$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}.bim
 '''
 }
 
@@ -276,15 +276,15 @@ step1_fitNULLGLMM.R \
 }
 
 
-params.saige_chunk_size = 50
-//params.saige_chunk_size = 20000
+//params.saige_chunk_size = 50
+params.saige_chunk_size = 20000
 
 process split_vcf_ranges {
     tag "${params.collection_name}.${chrom}"
     input:
     tuple file(vcf), file(tbi), val(chrom), val(filetype) from for_split_vcf
     output:
-    tuple file(vcf), file(tbi), val(chrom), val(filetype), file("0*") into for_saige_assoc_imp, testdump
+    tuple file(vcf), file(tbi), file(field), val(chrom), val(filetype), file("0*") into for_saige_assoc_imp, testdump
 
     shell:
     '''
@@ -296,7 +296,7 @@ process split_vcf_ranges {
 
 
 
-testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2], it[3], it[4], it[5][0], it [5][1] ] }.set{ saige_jobs }
+testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2], it[3], it[4], it[5], it[6][0], it [6][1] ] }.set{ saige_jobs }
 
 /* Perform SAIGE Assoc test on imputed VCFs */
 process saige_assoc {
@@ -307,13 +307,12 @@ process saige_assoc {
     // <-- single VCF and chromosome number
 //    tuple file(vcf), file(tbi), val(chrom), val(filetype),file(chunk) from for_saige_assoc_imp.transpose() // turn [chr1, [chunk1, chunk2, chunk3]] into [chr1, chunk1], [chr1, chunk2], [chr1, chunk3]
 //    tuple file(modelfile), file(varratio) from for_saige_assoc
-    tuple file(vcf), file(tbi), val(chrom), val(filetype), file(chunk), file(modelfile), file(varratio) from saige_jobs
+    tuple file(vcf), file(tbi), file(field), val(chrom), val(filetype), file(chunk), file(modelfile), file(varratio) from saige_jobs
 
     output:
     file("${chrom}.${chunk.name}.SAIGE.stats") into for_merge_sumstats
 
 shell:
-field = "GT"
 '''
 FIRSTPOS=$(head -n1 <!{chunk})
 LASTPOS=$(tail -n1 <!{chunk})
@@ -325,13 +324,14 @@ LASTPOS=$(tail -n1 <!{chunk})
 #fi
 
 FIELD="DS"
-AVAILABLE="GT"
+AVAILABLE=$(cat !{field})
 
 if [[ ! $AVAILABLE =~ "DS" ]]; then
     if [[ ! $AVAILABLE =~ "GT" ]]; then
         echo "Error: Neither dosage nor genotypes are present in the VCF files." >/dev/stderr
         exit 1
     else
+        echo "Warning: Could not find dosage field in VCFs, will use genotype field." >/dev/stderr
         FIELD="GT"
     fi
 fi
