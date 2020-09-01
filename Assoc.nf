@@ -44,8 +44,8 @@ for_plink_imp = Channel.create()
 // Creates new VCF/GZ sets.
 process prefilter {
     tag "${params.collection_name}"
-    label "bigmem"
-    label "longrunning"
+    label "big_mem"
+    label "long_running"
     cpus 4
     input:
     tuple file(vcf), val(filetype) from for_saige_imp
@@ -247,6 +247,7 @@ process saige_null {
     container "docker://wzhou88/saige:0.38"
     cpus 16
     time {2.d * task.attempt}
+    label 'long_running'
 
     input:
     tuple file(bed), file(bim), file(fam), file(logfile) from for_saige_null
@@ -391,6 +392,7 @@ done <allfiles
 
 process extract_dosage {
     tag "${params.collection_name}.${chrom}"
+    label 'long_running'
 
     input:
     tuple file (gz), file(tbi), val(chrom), val(filetype) from for_extract_dosage
@@ -569,6 +571,8 @@ paste -d" " evec.double-id.withheader pheno-column covars-column | tr -s ' ' \\\
 
 process plink_assoc {
     tag "${params.collection_name}.${chrom}"
+    label 'long_running'
+    label 'big_mem'
 
     input:
     tuple file(dosagemap), file(dosage), val(chrom) from for_plink
