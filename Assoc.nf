@@ -151,6 +151,9 @@ shell:
 mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
 /opt/plink2 --vcf !{vcf} --const-fid --memory 46000 --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
 
+mv !{params.collection_name}.!{chrom}.bim old_bim
+mawk '{$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
+
 # Might need some "chr" prefixing here
 '''
 }
