@@ -186,6 +186,7 @@ plink --bfile $FIRSTNAME --threads 4 --memory 60000 --merge-list merge-list --ma
 process prune {
     tag "${params.collection_name}"
     label "big_mem"
+    publishDir params.output, mode: 'copy'
     cpus 4
     input:
     tuple file(bed), file(bim), file(fam), file(logfile) from for_prune
