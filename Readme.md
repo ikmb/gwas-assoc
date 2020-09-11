@@ -63,7 +63,7 @@ if [ ! -f Assoc.config ]; then
 fi
 
 nextflow run -c Assoc.config ikmb/gwas-assoc \
-    --input_imputed_glob $INPUT \
+    --input_imputed_glob "$INPUT" \
     --fam $FAM \
     --anno $ANNO \
     --collection_name $NAME \
