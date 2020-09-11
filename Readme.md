@@ -14,7 +14,7 @@ Please ensure that you have 16 GB RAM installed on the computer where you intend
 
 1. Run the [Quality Control Pipeline on the example](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start) first
     - all files necessary for the association testing pipeline are automatically generated
-2. Run the wrapper script: `bash run-assoc.sh`
+2. Run the wrapper script (included in example package): `bash run-assoc.sh`
 
 
 ## How to Start
