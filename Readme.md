@@ -60,6 +60,25 @@ nextflow run -c Assoc.config ikmb/gwas-assoc \
 
 The pipeline output and reports will be written to the ```Assoc_output``` directory.
 
+### Parameters
+
+```
+--input_imputed_glob [glob]     A glob expression to specify the .vcf.gz files that should be used
+                                for association analysis
+--fam [file.fam]                 Optional, a Plink-style FAM file that will be used to select a
+                                subset of samples from the provided VCFs
+--anno [file.annotations]        Individual annotations, see QC manual:
+                                https://github.com/ikmb/gwas-qc/blob/master/Readme.md
+--collection_name [name]        Output filename prefix
+--output [directory]            Output directory
+--more_covars [covars.txt]      Optional, whitespace-separated list of covariates. See above.
+--more_covars_cols [COL1,COL2]  Optional, comma-separated list of covar column header names
+--null_filter [filter]            Optional, bcftools-style formatted INFO filter for generation of
+                                the SAIGE null model. Default: "R2>0.8"
+-resume                         Restart where the pipeline was cancelled or aborted. May or may
+                                not work, depending on your filesystem specifics
+```
+
 
 ## Advanced Configuration
 Please refer to the [Advanced Configuration section of the QC Pipeline](https://github.com/ikmb/gwas-qc/#advanced-configuration) The same principles apply.
