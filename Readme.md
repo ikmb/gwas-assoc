@@ -62,4 +62,4 @@ The pipeline output and reports will be written to the ```Assoc_output``` direct
 
 
 ## Advanced Configuration
-Please refer to the [Advanced Configuration section of the QC Pipeline)[https://github.com/ikmb/gwas-qc/#advanced-configuration] The same principles apply.
+Please refer to the [Advanced Configuration section of the QC Pipeline](https://github.com/ikmb/gwas-qc/#advanced-configuration) The same principles apply.
