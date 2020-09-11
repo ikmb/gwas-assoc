@@ -12,7 +12,7 @@ Please ensure that you have 16 GB RAM installed on the computer where you intend
 
 ## Quick Start
 
-→ If you are working on the UKSH medcluster, please see "Advanced Configuration" first.
+→ If you are working on the UKSH medcluster, please see [Advanced Configuration](https://github.com/ikmb/gwas-qc/#uksh-medcluster-configuration) first.
 
 Fortunately, the association testing pipeline itself requires very little configuration. If you intend to run the pipeline on an HPC cluster, please review the advanced configuration items first.
 
@@ -62,62 +62,4 @@ The pipeline output and reports will be written to the ```Assoc_output``` direct
 
 
 ## Advanced Configuration
-
-### Local and Side-wide Configuration
-
-You can extend the Nextflow default configuration by using (or creating) the following configuration files:
-- a ```nextflow.config``` in the current project folder. This file is automatically read if Nextflow is launched from this folder.
-- a site-wide ```$HOME/.nextflow/config```. This file is automatically read every time you run Nextflow
-
-It is usually a good idea to place additional configuration items to the side-wide configuration (see below for examples).
-
-### Shared Singularity Cache
-
-In a shared compute enviroment such as HPC clusters, it is often useful to share the singularity cache with other Nextflow/Singularity users so they would not have to download the same large files over and over again. To specify the singularity cache directory, add the following line to your config:
-```
-singularity.cacheDir = '/some/shared/place/singularity'
-```
-Note that the directory must be accessible from all compute nodes.
-
-### HPC Resources and Job Queues
-
-By default, all processes are launched on the computer where the QC is started. This is usually not appropriate on HPC login nodes where jobs should be sheduled on different nodes. Nextflow provides support for a broad range of job submission systems, such as SLURM, SGE or PBS/Torque. Please review the [Nextflow documenation on compute resources](https://www.nextflow.io/docs/latest/executor.html).
-
-For example, if you intend to use a SLURM environment, place the following code in your config (see "Shared Singularity Cache"):
-```
-process.executor = "slurm"
-executor.queue = "partition-name"  // optional
-executor.queueSize = 150           // optional, override max queue length for Nextflow
-process.clusterOptions = '--qos=someval' // optional, if you need to supply additional args to sbatch
-```
-
-### Mounting Paths into the Singularity Container
-
-To separate the operating system within the singularity container from the host system, Singularity only makes your home folder accessible to the insides. If your data files are stored in a directory different from your home (e.g. a shared storage ```/data_storage```), you will need to explicitly make it accessible by specifying additional singularity options in your config file:
-```
-singularity.runOptions = "-B /data_storage -B /some_other_storage -B /even_more_storage"
-```
-
-### UKSH medcluster configuration
-
-For optimal configuration on the UKSH medcluster, perform the following configuration changes (you only need to do this once):
-
-Create or change your `$HOME/.nextflow/config` file:
-```
-// use pre-populated singularity image cache
-singularity.cacheDir = "/work_ifs/sukmb388/singularity-cache"
-
-// bind /work_ifs folders. If you need more than $HOME and work_ifs, add another "-B /somewhere" switch.
-singularity.runOptions = "-B /work_ifs"
-
-// make nextflow use slurm by default
-profiles {
-    standard {
-        executor.name = "slurm"
-        executor.queueSize = 150
-        process.executor = "slurm"
-        process.queue = "all"
-    }
-}
-```
-
+Please refer to the [Advanced Configuration section of the QC Pipeline)[https://github.com/ikmb/gwas-qc/#advanced-configuration] The same principles apply.
