@@ -64,10 +64,10 @@ fi
 
 nextflow run -c Assoc.config ikmb/gwas-assoc \
     --input_imputed_glob "$INPUT" \
-    --fam $FAM \
-    --anno $ANNO \
-    --collection_name $NAME \
-    --output Assoc_output
+    --fam "$FAM" \
+    --anno "$ANNO" \
+    --collection_name "$NAME" \
+    --output "$OUTPUT"
 ```
 
 The pipeline output and reports will be written to the ```Assoc_output``` directory.
