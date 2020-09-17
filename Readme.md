@@ -51,7 +51,7 @@ ANNO="$HOME/example/output/Example/QCed/1000G_QCed.annotation.txt"
 NAME="1000G"
 
 # Target folder
-OUTPUT="Assoc_output"
+OUTPUT="output/Example/Assoc"
 
 # Actual call
 # The Assoc.config defines computation resources and can be fine-tuned if necessary. You can
