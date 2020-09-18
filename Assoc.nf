@@ -121,7 +121,7 @@ process merge_r2 {
 shell:
 '''
 cat r2-include.* >r2-include
-
+export TMPDIR=.
 mawk '$0 !~ /^chr/ {$1="chr"$1} {print}' r2-include | sort >r2-include.sorted
 '''
 }
