@@ -122,12 +122,7 @@ shell:
 '''
 cat r2-include.* >r2-include
 
-# Check if "chr" prefix is used in VCFs. If not, prefix the r2 list now
-#if [ "!{params.chrchr}" = "0" ]; then
-#    mawk '{print "chr"$0}' r2-include | sort >r2-include.sorted
-#else
-    sort r2-include >r2-include.sorted
-#fi
+mawk '$0 !~ /^chr/ {$1="chr"$1} {print}' r2-include | sort >r2-include.sorted
 '''
 }
 
@@ -149,10 +144,10 @@ shell:
 '''
 # Generate double-id FAM
 mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
-/opt/plink2 --vcf !{vcf} --const-fid --memory 46000 --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
+/opt/plink2 --vcf !{vcf} --const-fid --memory 46000 --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --output-chr chrM --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
 
 mv !{params.collection_name}.!{chrom}.bim old_bim
-mawk '{$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
+mawk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
 
 # Might need some "chr" prefixing here
 '''
