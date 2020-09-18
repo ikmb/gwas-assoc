@@ -68,6 +68,8 @@ shell:
 '''
 tabix -p vcf !{vcf}
 
+export TMPDIR=.
+
 # Gather lists of samples with proper double-ID handling
 bcftools query -l !{vcf} | sort >vcf-samples
 mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $2}' !{inc_fam} | sort >fam-samples
@@ -240,6 +242,8 @@ shell:
 '''
 module load Plink/1.9
 
+export TMPDIR=.
+
 LIFTOVER=!{params.nxfdir}/liftover
 BASENAME=!{bed.getBaseName()}_b37
 CHAIN=$LIFTOVER/assets/liftover/hg38ToHg19.over.chain.gz
@@ -355,6 +359,7 @@ shell:
 '''
 module load Plink/1.9
 echo Generating PCA SNP List file for variant selection
+export TMPDIR=.
 
 cat r2-include.* >r2-include
 
@@ -553,6 +558,7 @@ process make_saige_covars {
     shell:
 '''
 # Re-format sample ID and family ID to VCF rules
+export TMPDIR=.
 mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{inc_fam}  | sort >new-fam
 
 # Also re-format, but keep evec header
@@ -718,6 +724,7 @@ head -n1 !{params.collection_name}.1.000000000.SAIGE.stats >!{params.collection_
 # List all files into file, read it line by line.
 #ls -1 !{params.collection_name}.*.*.stats >allfiles
 #sort -t. -k2 allfiles >allfiles.sorted
+export TMPDIR=.
 
 for i in $(ls -1 !{params.collection_name}.*.*.stats | sort -t. -k2)
 do 
