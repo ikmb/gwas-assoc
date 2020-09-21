@@ -457,6 +457,10 @@ BEGIN{
                             if($i=="0/0") { printf " 1 0 0" }
                             else if($i=="1/0" || $i=="0/1") { printf " 0 1 0" }
                             else { printf " 0 0 1" }
+                        
+                        } else if(n==1) {
+                            # male samples on chrX, only one genotype
+                            printf " "$i " 0 "$i
                         } else {
                             print "VCF Error: GP or GT field not present or malformatted" >/dev/stderr
                             exit 1
@@ -470,6 +474,7 @@ BEGIN{
                             if(n==3) {
                                 printf " "array_GP[1]" "array_GP[2]" "array_GP[3]
                             } else {
+                                # males on chrX
                                 printf " "array_GP[1]" 0 "array_GP[2]
                             }
                         }
