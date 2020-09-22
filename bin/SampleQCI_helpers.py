@@ -927,8 +927,8 @@ def write_snps_autosomes_noLDRegions_noATandGC_noIndels(bim, outfile):
         list = re.split("\s+", line)
         chr  = int(list[0])
         pos  = int(list[3])
-        a1   = list[4]
-        a2   = list[5]
+        a1   = list[4].upper()
+        a2   = list[5].upper()
         # exclude non-autosomes
         if 0 < chr and chr < 23:
             # exclude xMHC SNPs AND exclude A/T and C/G SNPs AND exclude D/I SNPs
@@ -992,8 +992,8 @@ def write_snps_autosomes_noLDRegions_noIndels(bim, outfile):
         list = re.split("\s+", line)
         chr  = int(list[0])
         pos  = int(list[3])
-        a1   = list[4]
-        a2   = list[5]
+        a1   = list[4].upper()
+        a2   = list[5].upper()
         # exclude non-autosomes
         if 0 < chr and chr < 23:
             # exclude xMHC SNPs AND exclude A/T and C/G SNPs AND exclude D/I SNPs
