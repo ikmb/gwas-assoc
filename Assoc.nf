@@ -243,7 +243,7 @@ flashpca2 -d 10 --bfile !{bim.baseName} --numthreads 16 --outload loadings.txt -
 process saige_null {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    container "docker://wzhou88/saige:0.38"
+    container "docker://wzhou88/saige:0.42"
     cpus 16
     time {2.d * task.attempt}
     label 'long_running'
@@ -301,13 +301,14 @@ testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2]
 /* Perform SAIGE Assoc test on imputed VCFs */
 process saige_assoc {
     tag "${params.collection_name}.${chrom}.${chunk}"
-    container "docker://wzhou88/saige:0.38"
+    container "docker://wzhou88/saige:0.42"
     time {2.h * task.attempt}
     input:
     // <-- single VCF and chromosome number
 //    tuple file(vcf), file(tbi), val(chrom), val(filetype),file(chunk) from for_saige_assoc_imp.transpose() // turn [chr1, [chunk1, chunk2, chunk3]] into [chr1, chunk1], [chr1, chunk2], [chr1, chunk3]
 //    tuple file(modelfile), file(varratio) from for_saige_assoc
     tuple file(vcf), file(tbi), file(field), val(chrom), val(filetype), file(chunk), file(modelfile), file(varratio) from saige_jobs
+    file inc_fam
 
     output:
     file("${chrom}.${chunk.name}.SAIGE.stats") into for_merge_sumstats
@@ -326,6 +327,7 @@ LASTPOS=$(tail -n1 <!{chunk})
 FIELD="DS"
 AVAILABLE=$(cat !{field})
 
+# Choose between DS and GT, prefer DS over GT
 if [[ ! $AVAILABLE =~ "DS" ]]; then
     if [[ ! $AVAILABLE =~ "GT" ]]; then
         echo "Error: Neither dosage nor genotypes are present in the VCF files." >/dev/stderr
@@ -336,13 +338,39 @@ if [[ ! $AVAILABLE =~ "DS" ]]; then
     fi
 fi
 
+# Choose PAR region coordinates based on genome build
+case !{params.build} in
+    19 | 37 | hg19 | hg37 | GRCh37)
+        XPAR="60001-2699520,154931044-155260560"
+        ;;
+    38 | hg38 | GRCh38)
+        XPAR="10001-2781479,155701383-156030895"
+        ;;
+    *)
+        XPAR=""
+        ;;
+esac
+
+# Check whether we need to handle males in the X chromosome
+case $CHR in
+    23 | X | chr23 | chrX)
+        # set up special X handling for SAIGE
+        EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR --sampleFile_male=males.txt"
+
+        # Make list of males with double-ID
+        mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} if($5=="1") {print $1}}' !{inc_fam} >males.txt
+        ;;
+    *)
+        EXTRA_ARGS=""
+esac
+
 
 step2_SPAtests.R \
     --vcfFile="!{vcf}" \
     --vcfFileIndex="!{tbi}" \
     --vcfField=$FIELD \
     --chrom=$CHR \
-    --minMAF=0.001 \
+    --minMAF=0.0001 \
     --minMAC=1 \
     --GMMATmodelFile="!{modelfile}" \
     --varianceRatioFile="!{varratio}" \
@@ -352,7 +380,10 @@ step2_SPAtests.R \
     --end=$LASTPOS \
     --IsOutputAFinCaseCtrl=TRUE \
     --IsOutputNinCaseCtrl=TRUE \
-    --IsOutputHetHomCountsinCaseCtrl=TRUE
+    --IsOutputHetHomCountsinCaseCtrl=TRUE \
+    $EXTRA_ARGS
+
+
 
 # add odds ratio
 <temp.stats mawk 'NR==1{print $0 " OR";next} {print $0 " " exp($10)}' \
