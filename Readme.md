@@ -67,7 +67,8 @@ nextflow run -c Assoc.config ikmb/gwas-assoc \
     --fam "$FAM" \
     --anno "$ANNO" \
     --collection_name "$NAME" \
-    --output "$OUTPUT"
+    --output "$OUTPUT" \
+    --build 37
 ```
 
 The pipeline output and reports will be written to the ```Assoc_output``` directory.
@@ -89,6 +90,7 @@ The following list covers all parameters that may be specified for the Associati
 --more_covars_cols [COL1,COL2]  Optional, comma-separated list of covar column header names
 --null_filter [filter]          Optional, bcftools-style formatted INFO filter for generation of
                                 the SAIGE null model. Default: "R2>0.8"
+--build [build]                 Genome build, 37 or 38
 -resume                         Restart where the pipeline was cancelled or aborted. May or may
                                 not work, depending on your filesystem specifics
 ```
