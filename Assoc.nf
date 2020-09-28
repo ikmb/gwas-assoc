@@ -358,7 +358,7 @@ case $CHR in
         EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR --sampleFile_male=males.txt"
 
         # Make list of males with double-ID
-        mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} if($5=="1") {print $1}}' !{inc_fam} >males.txt
+        mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} else {$2=$1"_"$2;$1=$2} if($5=="1") {print $2}}' !{inc_fam} >males.txt
         ;;
     *)
         EXTRA_ARGS=""
