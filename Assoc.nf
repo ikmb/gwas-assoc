@@ -10,6 +10,8 @@ params.chrchr = 0 // should not be used anymore
 
 params.null_filter = "R2>0.8"
 
+params.ucsc_liftover = "" // points to base path where chain files and liftOver binary are found
+
 inc_fam = file(params.fam)
 
 def get_file_details(filename) {
@@ -163,7 +165,7 @@ process merge_plink {
     file(filelist) from for_merge_b38.collect()
 
     output:
-    tuple file("${params.collection_name}.bed"), file("${params.collection_name}.bim"), file("${params.collection_name}.fam"), file("${params.collection_name}.log") into for_prune
+    tuple file("${params.collection_name}.bed"), file("${params.collection_name}.bim"), file("${params.collection_name}.fam"), file("${params.collection_name}.log") into for_prune //, for_liftover
 
 
     shell:
@@ -404,17 +406,20 @@ process merge_saige_results {
 
 
     output:
-    file("${params.collection_name}.SAIGE.stats") into for_lift_sumstats_sumstats
+    file("${params.collection_name}.SAIGE.stats") into for_lift_sumstats_saige
 shell:
 '''
 
 ls -1 *.*.stats | sort -n >allfiles
 
 
-head -n1 !{sumstats[0]} >!{params.collection_name}.SAIGE.stats
+head -n1 !{sumstats[0]} >tmp
 while read -r line; do
-    tail -n +2 $line >>!{params.collection_name}.SAIGE.stats
+    tail -n +2 $line >>tmp
 done <allfiles
+
+
+<tmp mawk 'NR==1{print} NR>1{$1="chr"$1;$3=$1":"$2":"$4":"$5; print}' >>!{params.collection_name}.SAIGE.stats
 
 '''
 }
@@ -637,12 +642,327 @@ process merge_plink_results {
     file(stats) from for_plink_results.collect()
 
     output:
-    file "${params.collection_name}.Plink.stats"
+    file("${params.collection_name}.Plink.stats") into for_lift_sumstats_plink
 
 shell:
 '''
 head -n1 !{stats[0]} >!{params.collection_name}.Plink.stats
 
-ls !{stats} | sort -n | xargs -n1 tail -n +2 >>!{params.collection_name}.Plink.stats
+ls !{stats} | sort -n | xargs -n1 tail -n +2 | mawk '{$1="chr"$1;$2=$1":"$3":"$4":"$5; print}'>>!{params.collection_name}.Plink.stats
 '''
 }
+
+// ----------------------------------------------------------------------------
+
+process liftover {
+    tag "${params.collection_name}.${chrom}"
+    cpus 2
+
+//    publishDir params.output, mode: 'copy'
+    input:
+    tuple file(bed), file(bim), file(fam), file(logfile),val(chrom) from for_liftover
+    output:
+    tuple file("${bed.baseName}_lifted.bed"), file("${bim.baseName}_lifted.bim"), file("${fam.baseName}_lifted.fam"), file("${logfile.baseName}_lifted.log") optional true into for_merge_lifted
+    file ("postlift.${chrom}") optional true into for_merge_tables
+//    tuple file ("postlift.${chrom}"), file("unmapped-variants"), file("duplicates") into for_merge_lift
+//    tuple file("postlift.${chrom}"), file("unmapped-variants") into for_gen_liftdb
+shell:
+'''
+
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg38to37"
+    TEXT="hg38 to hg37"
+    NEWBUILD="38"
+else
+    SUFFIX="hg37to38"
+    TEXT="hg37 to hg38"
+    NEWBUILD="37"
+fi
+
+LIFTOVER=!{params.ucsc_liftover}/liftOver
+BASENAME=!{bed.getBaseName()}_lifted
+
+if [ "!{params.build}" == "37" ]; then
+    CHAIN=!{params.ucsc_liftover}/hg19ToHg38.over.chain.gz
+elif [ "!{params.build}" == "38" ]; then
+    CHAIN=!{params.ucsc_liftover}/hg38ToHg19.over.chain.gz
+else
+    echo "Error: Input must be build 37 or build 38 but is specified as !{params.build}" >&2
+    exit 0
+fi
+
+#if [ -x "$LIFTOVER" ]; then
+#    echo "Error: Cannot execute ${LIFTOVER}. File does not exist or is not executable." >&2
+#    exit 0
+#fi
+
+
+
+## Translate to chr:pos-pos and chr23 -> chrX
+#mawk '{print "chr"$1":"$4"-"$4}' !{bim} \\
+#    | sed 's/chr23/chrX/g' \\
+#    | sed 's/chr24/chrY/g' \\
+#    | sed 's/chr25/chrX/g' \\
+#    | sed 's/chr26/chrMT/g' \\
+#    > prelift.pos
+
+# Create UCSC BED file from BIM
+# Columns: chrX pos-1 pos rsID
+<!{bim} mawk '{ print $1, $4-1, $4, $4, $2 }' \\
+    | sed 's/^chr23/chrX/' \\
+    | sed 's/^chr24/chrY/' \\
+    | sed 's/^chr25/chrX/' \\
+    | sed 's/^chr26/chrMT/' >prelift.bed
+
+# lift-over
+$LIFTOVER prelift.bed $CHAIN postlift.bed unmapped.bed
+
+# Generate exclude list for unmapped variants
+<unmapped.bed mawk '$0~/^#/{next} {print $5}' >unmapped-variants &
+
+# Generate update-pos list for Plink, exclude double variants
+<postlift.bed mawk '{print $5,$3}' >new-pos &
+
+wait
+
+<postlift.bed mawk '{if($1 != "chr!{chrom}") {print $5}}' >chromosome-switchers &
+<new-pos sort | uniq -d | cut -f1 -d" ">duplicates &
+
+wait
+
+cat chromosome-switchers >>duplicates
+
+/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --exclude duplicates --make-pgen --out no-duplicates
+/opt/plink2 --pfile no-duplicates --exclude unmapped-variants --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
+/opt/plink2 --pfile ${BASENAME} --make-bed --out ${BASENAME}.tmp
+
+plink --bfile ${BASENAME}.tmp --merge-x no-fail --make-bed --out ${BASENAME}
+mv ${BASENAME}.bim tmp
+mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
+mv postlift.bed postlift.!{chrom}
+'''
+}
+
+// Merge b37 Plink chromosome-wise sets into a single Plink set
+process merge_plink_lifted {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+    memory 30000
+    cpus 4
+    time {8.h * task.attempt}
+
+    input:
+    file(filelist) from for_merge_lifted.collect()
+
+    output:
+    tuple file("${params.collection_name}_lifted*.bed"), file("${params.collection_name}_lifted*.bim"), file("${params.collection_name}_lifted*.fam"), file("${params.collection_name}_lifted*.log")
+
+    shell:
+'''
+
+
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg38to37"
+    TEXT="hg38 to hg37"
+    NEWBUILD="38"
+else
+    SUFFIX="hg37to38"
+    TEXT="hg37 to hg38"
+    NEWBUILD="37"
+fi
+
+ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
+FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | head -n1)
+module load Plink/1.9
+plink --bfile $FIRSTNAME --memory 28000 --threads 4 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}_lifted_b$NEWBUILD
+mv !{params.collection_name}_lifted_b${NEWBUILD}.bim tmp
+mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}_lifted_b${NEWBUILD}.bim
+'''
+}
+
+
+process liftover_pruned {
+    tag "${params.collection_name}"
+    cpus 2
+    publishDir params.output, mode: 'copy'
+    input:
+    tuple file(bed), file(bim), file(fam), file(logfile) from for_liftover_pruned
+    output:
+    tuple file("${params.collection_name}.pruned_lifted*.bed"), file("${params.collection_name}.pruned_lifted*.bim"), file("${params.collection_name}.pruned_lifted*.fam"), file("${params.collection_name}.pruned_lifted*.log")
+    //file "postlift.${chrom}" into for_merge_lift
+shell:
+'''
+module load Plink/1.9
+
+LIFTOVER="!{params.ucsc_liftover}/liftOver"
+
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg38to37"
+    TEXT="hg38 to hg37"
+    NEWBUILD="38"
+else
+    SUFFIX="hg37to38"
+    TEXT="hg37 to hg38"
+    NEWBUILD="37"
+fi
+
+BASENAME="!{bed.getBaseName()}_lifted_b$NEWBUILD"
+
+if [ "!{params.build}" == "37" ]; then
+    CHAIN=!{params.ucsc_liftover}/hg19ToHg38.over.chain.gz
+elif [ "!{params.build}" == "38" ]; then
+    CHAIN=!{params.ucsc_liftover}/hg38ToHg19.over.chain.gz
+else
+    echo "Error: Input must be build 37 or build 38 but is specified as !{params.build}" >&2
+    exit 0
+fi
+
+#if [ -x "$LIFTOVER" ]; then
+#    echo "Error: Cannot execute ${LIFTOVER}. File does not exist or is not executable." >&2
+#    exit 0
+#fi
+
+
+## Translate to chr:pos-pos and chr23 -> chrX
+#mawk '{print "chr"$1":"$4"-"$4}' !{bim} \\
+#    | sed 's/chr23/chrX/g' \\
+#    | sed 's/chr24/chrY/g' \\
+#    | sed 's/chr25/chrX/g' \\
+#    | sed 's/chr26/chrMT/g' \\
+#    > prelift.pos
+
+# Create UCSC BED file from BIM
+# Columns: chrX pos-1 pos rsID
+<!{bim} mawk '{ print $1, $4-1, $4, $4, $2 }' \\
+    | sed 's/^chr23/chrX/' \\
+    | sed 's/^chr24/chrY/' \\
+    | sed 's/^chr25/chrX/' \\
+    | sed 's/^chr26/chrMT/' >prelift.bed
+
+# lift-over
+$LIFTOVER prelift.bed $CHAIN postlift.bed unmapped.bed
+
+# Generate exclude list for unmapped variants
+<unmapped.bed mawk '$0~/^#/{next} {print $5}' >unmapped-variants &
+
+# Generate update-pos list for Plink, exclude double variants
+<postlift.bed mawk '{print $5,$3}' >new-pos &
+wait
+
+
+# Find chromosome switchers
+<postlift.bed mawk '{newchr=substr($1,4); split($5,oldparts,":");oldchr=substr(oldparts[1],4); if(newchr!=oldchr){print $5}}' >chromosome-switchers &
+# for chromosome-wise only: <postlift.bed mawk '{if($1 != "chr{chrom}") {print $5}}' >chromosome-switchers
+<new-pos sort | uniq -d | cut -f1 -d" ">duplicates &
+wait
+
+
+cat chromosome-switchers >>duplicates
+
+/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --exclude duplicates --make-pgen --out no-duplicates
+/opt/plink2 --pfile no-duplicates --exclude unmapped-variants --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
+/opt/plink2 --pfile ${BASENAME} --make-bed --output-chr chrM --out ${BASENAME}.tmp
+
+plink --bfile ${BASENAME}.tmp --merge-x no-fail --output-chr chrM --make-bed --out ${BASENAME}
+mv ${BASENAME}.bim tmp
+mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
+rm postlift.bed
+
+'''
+}
+
+
+process merge_liftover_tables {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+
+    input:
+    file(postlift) from for_merge_tables.collect()
+
+    output:
+    file ("${params.collection_name}.liftover.table.*") into (for_lift_sumstats_table_plink, for_lift_sumstats_table_saige)
+
+    shell:
+'''
+
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg37to38"
+else
+    SUFFIX="hg38to37"
+fi
+
+cat postlift.* >"!{params.collection_name}.liftover.table.${SUFFIX}"
+
+'''
+}
+
+
+process lift_plink_sumstats {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+    memory 28.GB
+    time { 12.h * task.attempt }
+
+    input:
+    file(sumstats) from for_lift_sumstats_plink
+    file(lifttable) from for_lift_sumstats_table_plink
+
+    output:
+    file("${sumstats}.lifted.*")
+
+shell:
+'''
+
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg38to37"
+    TEXT="hg38 to hg37"
+    NEWBUILD="38"
+else
+    SUFFIX="hg37to38"
+    TEXT="hg37 to hg38"
+    NEWBUILD="37"
+fi
+
+
+echo "Lifted from ${TEXT}. Liftover protocol: " >new-meta
+stats2hg19_plink.pl !{lifttable} !{sumstats} >>new-meta
+mv !{sumstats}.b37 !{sumstats}.lifted.${NEWBUILD}
+mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
+'''
+}
+
+
+process lift_saige_sumstats {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+    memory 28.GB
+    time { 12.h * task.attempt }
+
+    input:
+    file(sumstats) from for_lift_sumstats_saige
+    file(lifttable) from for_lift_sumstats_table_saige
+
+    output:
+    file("${sumstats}.lifted.*")
+
+shell:
+'''
+
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg38to37"
+    TEXT="hg38 to hg37"
+    NEWBUILD="38"
+else
+    SUFFIX="hg37to38"
+    TEXT="hg37 to hg38"
+    NEWBUILD="37"
+fi
+
+
+echo "Lifted from ${TEXT}. Liftover protocol: " >new-meta
+stats2hg19_saige.pl !{lifttable} !{sumstats} >>new-meta
+mv !{sumstats}.b37 !{sumstats}.lifted.${NEWBUILD}
+mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
+'''
+}
+

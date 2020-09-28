@@ -3,6 +3,8 @@
 use warnings;
 use strict;
 
+use Data::Dumper;
+
 # Process CLI args
 my $dict_name = shift;
 my $stats_name = shift;
@@ -22,7 +24,7 @@ while(<$dict_fh>) {
     @parts = split ' ';
     @varparts = split ':', $parts[4];
     # Insert only if no chromosomes are changed
-    if(substr($parts[0], 3) eq $varparts[0]) {
+    if($parts[0] eq $varparts[0]) {
         $dict{"$parts[0]:$parts[3]"} = $parts[2];
         $count_keys++;
     } else {
@@ -45,8 +47,9 @@ my $count_skipped=0;
 while(<$stats_fh>) {
     chomp;
     @parts = split ' ';
-    if(exists($dict{"$parts[0]:$parts[1]"})) {
-        $parts[1] = $dict{"$parts[0]:$parts[1]"};
+    my @varparts = split ':', $parts[1];
+    if(exists($dict{"$varparts[0]:$varparts[1]"})) {
+        $parts[2] = $dict{"$varparts[0]:$varparts[1]"};
         print $outfh join(' ', @parts) . "\n";
     } else {
         $count_skipped++;
