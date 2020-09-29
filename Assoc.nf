@@ -725,7 +725,7 @@ $LIFTOVER prelift.bed $CHAIN postlift.bed unmapped.bed
 
 wait
 
-<postlift.bed mawk '{if($1 != "chr!{chrom}") {print $5}}' >chromosome-switchers &
+<postlift.bed mawk '{if($1 != "chr!{chrom}" && $1 != "!{chrom}") {print $5}}' >chromosome-switchers &
 <new-pos sort | uniq -d | cut -f1 -d" ">duplicates &
 
 wait
