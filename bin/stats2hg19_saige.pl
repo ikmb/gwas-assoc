@@ -49,7 +49,7 @@ while(<$stats_fh>) {
         $parts[1] = $dict{"$parts[0]:$parts[1]"};
         print $outfh join(' ', @parts) . "\n";
     } else {
-        print "parts: @parts\n";
+#        print "parts: @parts\n";
         $count_skipped++;
     }
 }

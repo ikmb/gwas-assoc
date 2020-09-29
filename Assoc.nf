@@ -413,13 +413,13 @@ shell:
 ls -1 *.*.stats | sort -n >allfiles
 
 
-head -n1 !{sumstats[0]} >tmp
+head -n1 !{sumstats[0]} | tr -s '[:space:]' ' '>tmp
 while read -r line; do
     tail -n +2 $line >>tmp
 done <allfiles
 
 
-<tmp mawk 'NR==1{print} NR>1{$1="chr"$1;$3=$1":"$2":"$4":"$5; print}' >>!{params.collection_name}.SAIGE.stats
+<tmp mawk 'NR==1{print} NR>1{if(substr($1,1,3)!="chr"){$1="chr"$1} $3=$1":"$2":"$4":"$5; print}' >>!{params.collection_name}.SAIGE.stats
 
 '''
 }
@@ -646,9 +646,10 @@ process merge_plink_results {
 
 shell:
 '''
-head -n1 !{stats[0]} >!{params.collection_name}.Plink.stats
+# extract first line, convert tabs to space
+head -n1 !{stats[0]} | tr -s '[:space:]' ' ' | xargs >!{params.collection_name}.Plink.stats
 
-ls !{stats} | sort -n | xargs -n1 tail -n +2 | mawk '{$1="chr"$1;$2=$1":"$3":"$4":"$5; print}'>>!{params.collection_name}.Plink.stats
+ls !{stats} | sort -n | xargs -n1 tail -n +2 | mawk '{if(substr($1,1,3)!="chr"){$1="chr"$1} $2=$1":"$3":"$4":"$5; print}'>>!{params.collection_name}.Plink.stats
 '''
 }
 
