@@ -867,7 +867,7 @@ cat chromosome-switchers >>duplicates
 plink --bfile ${BASENAME}.tmp --merge-x no-fail --output-chr chrM --make-bed --out ${BASENAME}
 mv ${BASENAME}.bim tmp
 mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
-rm postlift.bed
+rm postlift.bed ${BASENAME}.tmp*
 
 '''
 }
