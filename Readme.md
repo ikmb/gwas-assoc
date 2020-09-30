@@ -28,9 +28,9 @@ You will need:
     - at most one chromosome per `.vcf.gz` file. Multiple chromosomes per files are not supported. If a file happens to have multiple chromosomes, only the first will be analyzed.
     - any chromosome codes are supported (i.e. `chrX`, `X`, `23`, `chr23`, `chromosomeX` are just fine)
     - your VCF files require dosage data (DS tag) for imputed data or genotype calls (GT tag) for genotyped data. If both tags are found, DS is chosen.
-    - the `INFO` column in the VCF files should contain an imputation score. This is used to filter the input variants to create a good null model for SAIGE. For topmed imputations, we found `R2>0.8` to yield good results. This filter is not used for Plink-based association testing. 
-- Individuals annotations as created by the QC counterpart. Please see [the manual](https://github.com/ikmb/gwas-qc/Readme.md) on how to create one if you didn't use the QC pipeline before imputation. Otherwise, you can use the annotations found in the `QCed` output folder.
-- Optionally, you can specify a FAM file as a sample filter. Only those files in the FAM file will be used from the VCFs. Note that *all* samples from the FAM file must be present in the VCF files.
+    - the `INFO` column in the VCF files should contain an imputation score. This is used to filter the input variants to create a good null model for SAIGE. For topmed imputations, we found `R2>0.8` to yield good results. If the given tag is not found in the VCF file, the default value 1.0 is assumed, making all variants pass the filter. This filter is not used for Plink-based association testing. 
+- A FAM file to update sex and phenotype from. Only those files in the FAM file will be used from the VCFs. Note that *all* samples from the FAM file must be present in the VCF files. **Note: if the FAM family ID is 0, the sample name in the VCF should be the individual ID. If the FID is not 0, the sample name should be the family ID and the individual ID with an underscore (i.e. FID 1234 IID 9876 should be 1234_9876 in the VCF file)**
+- The genome build of the input data, which will result in SAIGE handling the sex chromosomes according to the coordinates of the pseudoautosomal regions. Possible values are 37 and 38.
 - Optionally, you can specify additional covariates to be used in association testing. By default, 10 principal components are automatically generated and used. If you want additional covariates, have a whitespace-separated file with a header at hand. The first column should be the sample ID in `FID_IID` format, any futher column is treated as a covariate. Specify the covars file with `--more_covars $FILE` and the columns to be used with `--more_covars_cols AGE,SEX`, where `AGE` and `SEX` are the respective column headers from the covar file that you wish to be included.
 
 The following wrapper script is also included in [the example](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start)
@@ -65,7 +65,6 @@ fi
 nextflow run -c Assoc.config ikmb/gwas-assoc \
     --input_imputed_glob "$INPUT" \
     --fam "$FAM" \
-    --anno "$ANNO" \
     --collection_name "$NAME" \
     --output "$OUTPUT" \
     --build 37
@@ -80,10 +79,8 @@ The following list covers all parameters that may be specified for the Associati
 ```
 --input_imputed_glob [glob]     A glob expression to specify the .vcf.gz files that should be used
                                 for association analysis
---fam [file.fam]                 Optional, a Plink-style FAM file that will be used to select a
+--fam [file.fam]                 A Plink-style FAM file that will be used to select a
                                 subset of samples from the provided VCFs
---anno [file.annotations]        Individual annotations, see QC manual:
-                                https://github.com/ikmb/gwas-qc/blob/master/Readme.md
 --collection_name [name]        Output filename prefix
 --output [directory]            Output directory
 --more_covars [covars.txt]      Optional, whitespace-separated list of covariates. See above.
