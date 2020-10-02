@@ -132,7 +132,7 @@ mawk '$0 !~ /^chr/ {$1="chr"$1} {print}' r2-include | sort >r2-include.sorted
    phenotype and sex columns from QC FAM file. */
 process make_plink {
 //    publishDir params.output, mode: 'copy'
-    label "bigmem"
+    label "big_mem"
     tag "${params.collection_name}.$chrom"
 
     input:
@@ -145,8 +145,9 @@ process make_plink {
 shell:
 '''
 # Generate double-id FAM
+MEM=!{task.memory.toMega()-1000}
 mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
-/opt/plink2 --vcf !{vcf} --const-fid --memory 46000 --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --output-chr chrM --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
+/opt/plink2 --vcf !{vcf} --const-fid --memory $MEM --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --output-chr chrM --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
 
 mv !{params.collection_name}.!{chrom}.bim old_bim
 mawk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
@@ -158,7 +159,7 @@ mawk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{param
 process merge_plink {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    memory 64000
+    memory 30.GB
     cpus 4
     time {8.h * task.attempt}
     input:
@@ -171,9 +172,10 @@ process merge_plink {
     shell:
 '''
 ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
+MEM=!{task.memory.toMega()-1000}
 FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | head -n1)
 module load Plink/1.9
-plink --bfile $FIRSTNAME --threads 4 --memory 60000 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
+plink --bfile $FIRSTNAME --threads 4 --memory $MEM --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
 #mv !{params.collection_name}.bim tmp
 #mawk '{$2=$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}.bim
 '''
@@ -198,6 +200,7 @@ module load Plink/1.9
 echo Generating PCA SNP List file for variant selection
 
 R2=!{r2}
+MEM=!{task.memory.toMega()-1000}
 
 if [ ! -s $R2 ]; then
     # No entries in include list. This means that either we have genotyped-only
@@ -208,14 +211,14 @@ if [ ! -s $R2 ]; then
 fi
 
 
-/opt/plink2 --memory 60000 --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract $R2 --indep-pairwise 50 5 0.2 --out _prune
-/opt/plink2 --memory 60000 --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract _prune.prune.in --maf 0.05 --make-bed --out intermediate
+/opt/plink2 --memory $MEM --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract $R2 --indep-pairwise 50 5 0.2 --out _prune
+/opt/plink2 --memory $MEM --threads 4 --bed !{bed} --bim !{bim} --fam !{fam} --extract _prune.prune.in --maf 0.05 --make-bed --out intermediate
 
 python -c 'from SampleQCI_helpers import *; write_snps_autosomes_noLDRegions_noATandGC_noIndels("!{bim}", "include_variants")'
 sort include_variants >include_variants.sorted
 
 comm -12 include_variants.sorted $R2 >include-r2-variants
-/opt/plink2 --memory 60000 --threads 4 --bfile intermediate --chr 1-22 --extract include-r2-variants --output-chr chrM --make-bed --out !{params.collection_name}.pruned
+/opt/plink2 --memory $MEM --threads 4 --bfile intermediate --chr 1-22 --extract include-r2-variants --output-chr chrM --make-bed --out !{params.collection_name}.pruned
 rm intermediate*
 
 '''
@@ -224,7 +227,7 @@ rm intermediate*
 process generate_pcs {
     cpus 16
     tag "${params.collection_name}"
-    label "bigmem"
+    label "big_mem"
 
 input:
     tuple file(bed), file(bim), file(fam), file(log) from for_generate_pcs
@@ -235,7 +238,9 @@ output:
 shell:
 '''
 module load FlashPCA
-flashpca2 -d 10 --bfile !{bim.baseName} --numthreads 16 --outload loadings.txt --outmeansd meansd.txt
+MEM=!{task.memory.toMega()-1000}
+
+flashpca2 -d 10 --bfile !{bim.baseName} --memory $MEM --numthreads 16 --outload loadings.txt --outmeansd meansd.txt
 
 '''
 }
@@ -625,11 +630,12 @@ process plink_assoc {
 shell:
 '''
 module load Plink/1.9
+MEM=!{task.memory.toMega()-1000}
 
 plink --fam !{fam} --map !{dosagemap} --dosage !{dosage} skip0=2 skip1=0 skip2=1 format=3 case-control-freqs \\
     --covar !{pheno} --covar-name PC1-PC10 \\
     --allow-no-sex --ci 0.95 \\
-    --out !{chrom}
+    --out !{chrom} --memory $MEM
 
 '''
 }
@@ -658,7 +664,7 @@ ls !{stats} | sort -n | xargs -n1 tail -n +2 | mawk '{if(substr($1,1,3)!="chr"){
 process liftover {
     tag "${params.collection_name}.${chrom}"
     cpus 2
-
+    label 'big_mem'
 //    publishDir params.output, mode: 'copy'
     input:
     tuple file(bed), file(bim), file(fam), file(logfile),val(chrom) from for_liftover
@@ -669,6 +675,7 @@ process liftover {
 //    tuple file("postlift.${chrom}"), file("unmapped-variants") into for_gen_liftdb
 shell:
 '''
+MEM=!{task.memory.toMega()-1000}
 
 if [ "!{params.build}" == "37" ]; then
     SUFFIX="hg38to37"
@@ -692,10 +699,10 @@ else
     exit 0
 fi
 
-#if [ -x "$LIFTOVER" ]; then
-#    echo "Error: Cannot execute ${LIFTOVER}. File does not exist or is not executable." >&2
-#    exit 0
-#fi
+if [ ! -x "$LIFTOVER" ]; then
+    echo "Error: Cannot execute ${LIFTOVER}. File does not exist or is not executable." >&2
+    exit 0
+fi
 
 
 
@@ -733,11 +740,11 @@ wait
 
 cat chromosome-switchers >>duplicates
 
-/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --exclude duplicates --make-pgen --out no-duplicates
-/opt/plink2 --pfile no-duplicates --exclude unmapped-variants --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
-/opt/plink2 --pfile ${BASENAME} --make-bed --out ${BASENAME}.tmp
+/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --memory $MEM --exclude duplicates --make-pgen --out no-duplicates
+/opt/plink2 --pfile no-duplicates --memory $MEM --exclude unmapped-variants --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
+/opt/plink2 --pfile ${BASENAME} --memory $MEM --make-bed --out ${BASENAME}.tmp
 
-plink --bfile ${BASENAME}.tmp --merge-x no-fail --make-bed --out ${BASENAME}
+plink --bfile ${BASENAME}.tmp --memory $MEM --merge-x no-fail --make-bed --out ${BASENAME}
 mv ${BASENAME}.bim tmp
 mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
 mv postlift.bed postlift.!{chrom}
@@ -748,9 +755,9 @@ mv postlift.bed postlift.!{chrom}
 process merge_plink_lifted {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    memory 30000
     cpus 4
-    time {8.h * task.attempt}
+    label 'big_mem'
+    label 'long_running'
 
     input:
     file(filelist) from for_merge_lifted.collect()
@@ -760,6 +767,7 @@ process merge_plink_lifted {
 
     shell:
 '''
+MEM=!{task.memory.toMega()-1000}
 
 
 if [ "!{params.build}" == "37" ]; then
@@ -775,7 +783,7 @@ fi
 ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
 FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | head -n1)
 module load Plink/1.9
-plink --bfile $FIRSTNAME --memory 28000 --threads 4 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}_lifted_b$NEWBUILD
+plink --bfile $FIRSTNAME --memory $MEM --threads 4 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}_lifted_b$NEWBUILD
 mv !{params.collection_name}_lifted_b${NEWBUILD}.bim tmp
 mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}_lifted_b${NEWBUILD}.bim
 '''
@@ -789,11 +797,12 @@ process liftover_pruned {
     input:
     tuple file(bed), file(bim), file(fam), file(logfile) from for_liftover_pruned
     output:
-    tuple file("${params.collection_name}.pruned_lifted*.bed"), file("${params.collection_name}.pruned_lifted*.bim"), file("${params.collection_name}.pruned_lifted*.fam"), file("${params.collection_name}.pruned_lifted*.log")
+    tuple file("${params.collection_name}.pruned_lifted*.bed"), file("${params.collection_name}.pruned_lifted*.bim"), file("${params.collection_name}.pruned_lifted*.fam"), file("${params.collection_name}.pruned_lifted*.log") optional true
     //file "postlift.${chrom}" into for_merge_lift
 shell:
 '''
 module load Plink/1.9
+MEM=!{task.memory.toMega()-1000}
 
 LIFTOVER="!{params.ucsc_liftover}/liftOver"
 
@@ -818,10 +827,10 @@ else
     exit 0
 fi
 
-#if [ -x "$LIFTOVER" ]; then
-#    echo "Error: Cannot execute ${LIFTOVER}. File does not exist or is not executable." >&2
-#    exit 0
-#fi
+if [ ! -x "$LIFTOVER" ]; then
+    echo "Error: Cannot execute ${LIFTOVER}. File does not exist or is not executable." >&2
+    exit 0
+fi
 
 
 ## Translate to chr:pos-pos and chr23 -> chrX
@@ -860,11 +869,11 @@ wait
 
 cat chromosome-switchers >>duplicates
 
-/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --exclude duplicates --make-pgen --out no-duplicates
-/opt/plink2 --pfile no-duplicates --exclude unmapped-variants --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
-/opt/plink2 --pfile ${BASENAME} --make-bed --output-chr chrM --out ${BASENAME}.tmp
+/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --memory $MEM --exclude duplicates --make-pgen --out no-duplicates
+/opt/plink2 --pfile no-duplicates --exclude unmapped-variants --memory $MEM --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
+/opt/plink2 --pfile ${BASENAME} --make-bed --output-chr chrM --memory $MEM --out ${BASENAME}.tmp
 
-plink --bfile ${BASENAME}.tmp --merge-x no-fail --output-chr chrM --make-bed --out ${BASENAME}
+plink --bfile ${BASENAME}.tmp --merge-x no-fail --output-chr chrM --memory $MEM --make-bed --out ${BASENAME}
 mv ${BASENAME}.bim tmp
 mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
 rm postlift.bed ${BASENAME}.tmp*
