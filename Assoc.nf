@@ -159,9 +159,9 @@ mawk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{param
 process merge_plink {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    memory 30.GB
+    label 'big_mem'
     cpus 4
-    time {8.h * task.attempt}
+    label 'long_running'
     input:
     file(filelist) from for_merge_b38.collect()
 
@@ -910,8 +910,8 @@ cat postlift.* >"!{params.collection_name}.liftover.table.${SUFFIX}"
 process lift_plink_sumstats {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    memory 28.GB
-    time { 12.h * task.attempt }
+    label 'big_mem'
+    label 'long_running'
 
     input:
     file(sumstats) from for_lift_sumstats_plink
@@ -945,8 +945,8 @@ mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
 process lift_saige_sumstats {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    memory 28.GB
-    time { 12.h * task.attempt }
+    label 'big_mem'
+    label 'long_running'
 
     input:
     file(sumstats) from for_lift_sumstats_saige
