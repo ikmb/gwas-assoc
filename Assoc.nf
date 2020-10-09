@@ -269,6 +269,8 @@ sed 's/^chr//' !{bim.baseName}.bim >tmp.bim
 ln -s !{bed} tmp.bed
 ln -s !{fam} tmp.fam
 
+export R_LIBS_USER=/dev/null
+
 step1_fitNULLGLMM.R \
     --plinkFile=tmp \
     --phenoFile=!{pheno} \
@@ -371,6 +373,7 @@ case $CHR in
         EXTRA_ARGS=""
 esac
 
+export R_LIBS_USER=/dev/null
 
 step2_SPAtests.R \
     --vcfFile="!{vcf}" \
