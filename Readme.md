@@ -88,6 +88,7 @@ The following list covers all parameters that may be specified for the Associati
 --null_filter [filter]          Optional, bcftools-style formatted INFO filter for generation of
                                 the SAIGE null model. Default: "R2>0.8"
 --build [build]                 Genome build, 37 or 38
+--trait [type]                  Trait type to analyze. May be 'binary' (default) or 'quantitative')
 -resume                         Restart where the pipeline was cancelled or aborted. May or may
                                 not work, depending on your filesystem specifics
 ```

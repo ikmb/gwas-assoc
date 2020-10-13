@@ -5,7 +5,7 @@ params.output = "output"
 params.more_covars = "."
 params.more_covars_cols = ""
 params.liftover = 0
-
+params.trait = "binary"
 params.chrchr = 0 // should not be used anymore
 
 params.null_filter = "R2>0.8"
@@ -37,6 +37,59 @@ for_extract_dosage = Channel.create()
 for_gen_r2 = Channel.create()
 for_plink_imp = Channel.create()
 
+
+process option_check {
+    errorStrategy 'terminate'
+    input:
+    output:
+
+shell:
+'''
+#!/bin/bash
+ERROR=0
+
+# FAM file
+if [ ! -f "!{params.fam}" ]; then
+    echo "Cannot open FAM file. Please fix the filename given to --fam. You also might want to check the documentation about mounting external paths:" >/dev/stderr
+    echo "   https://github.com/ikmb/gwas-qc/#mounting-paths-into-the-singularity-container" >/dev/stderr
+    ERROR=1
+fi
+
+# Covars
+if [ "!{params.more_covars}" != "." ] && [ ! -f "!{params.more_covars}" ]; then
+    echo "Cannot open covariate file.  Please fix the filename given to --fam. You also might want to check the documentation about mounting external paths:" >/dev/stderr
+    echo "   https://github.com/ikmb/gwas-qc/#mounting-paths-into-the-singularity-container" >/dev/stderr
+    ERROR=1
+fi
+
+if [ "!{params.more_covars}" != "." ] && [ -f "!{params.more_covars}" ] && [ "!{params.more_covars_cols}" == "" ]; then
+    echo "A covariate file has been specified with --more_covars but no covar columns were given using --more_covars_cols." >/dev/stderr
+    ERROR=1
+fi
+
+
+# Genome build
+case "!{params.build}" in
+    37) ;;
+    38) ;;
+    *) echo "Unsupported genome build. Please specify --build 37 or --build 38." >/dev/stderr
+       ERROR=1
+       ;;
+esac
+
+# Trait type
+case "!{params.trait}" in
+    binary) ;;
+    quantitative) ;;
+    *) echo "Unsupported trait type. Please specify 'binary' or 'quantitative' for --trait. " >/dev/stderr
+       ERROR=1
+       ;;
+esac
+
+
+exit $ERROR
+'''
+}
 
 // prefilter
 // ---------
@@ -250,9 +303,8 @@ flashpca2 -d 10 --bfile !{bim.baseName} --memory $MEM --numthreads 16 --outload 
 process saige_null {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    container "docker://wzhou88/saige:0.42"
+    container "docker://wzhou88/saige:0.42.1"
     cpus 16
-    time {2.d * task.attempt}
     label 'long_running'
 
     input:
@@ -265,11 +317,24 @@ process saige_null {
 shell:
     '''
 
+
+
 sed 's/^chr//' !{bim.baseName}.bim >tmp.bim
 ln -s !{bed} tmp.bed
 ln -s !{fam} tmp.fam
 
 export R_LIBS_USER=/dev/null
+
+if [ "!{params.trait}" == "binary" ]; then
+    TRAIT_ARGS="--traitType=binary"
+elif [ "!{params.trait}" == "quantitative" ]; then
+    TRAIT_ARGS="--traitType=quantitative --invNormalize=TRUE --tauInit=1,0"
+else
+    echo "Unsupported trait type. Only 'binary' and 'quantitative' traits are supported." >/dev/stderr
+    exit 1
+fi
+
+
 
 step1_fitNULLGLMM.R \
     --plinkFile=tmp \
@@ -277,7 +342,7 @@ step1_fitNULLGLMM.R \
     --phenoCol=Pheno \
     --covarColList=$(cat !{covar_list}) \
     --sampleIDColinphenoFile=IID \
-    --traitType=binary        \
+    $TRAIT_ARGS        \
     --outputPrefix=!{params.collection_name} \
     --nThreads=16 \
     --LOCO=FALSE
@@ -310,8 +375,8 @@ testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2]
 /* Perform SAIGE Assoc test on imputed VCFs */
 process saige_assoc {
     tag "${params.collection_name}.${chrom}.${chunk}"
-    container "docker://wzhou88/saige:0.42"
-    time {2.h * task.attempt}
+    container "docker://wzhou88/saige:0.42.1"
+    label 'long_running'
     input:
     // <-- single VCF and chromosome number
 //    tuple file(vcf), file(tbi), val(chrom), val(filetype),file(chunk) from for_saige_assoc_imp.transpose() // turn [chr1, [chunk1, chunk2, chunk3]] into [chr1, chunk1], [chr1, chunk2], [chr1, chunk3]
