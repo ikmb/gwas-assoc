@@ -1,5 +1,5 @@
 
-
+params.tauInit="1,0"
 params.collection_name = "collection_name"
 params.output = "output"
 params.more_covars = "."
@@ -328,7 +328,7 @@ export R_LIBS_USER=/dev/null
 if [ "!{params.trait}" == "binary" ]; then
     TRAIT_ARGS="--traitType=binary"
 elif [ "!{params.trait}" == "quantitative" ]; then
-    TRAIT_ARGS="--traitType=quantitative --invNormalize=TRUE --tauInit=1,0"
+    TRAIT_ARGS="--traitType=quantitative --invNormalize=TRUE --tauInit=!{params.tauInit}"
 else
     echo "Unsupported trait type. Only 'binary' and 'quantitative' traits are supported." >/dev/stderr
     exit 1
