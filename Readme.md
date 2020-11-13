@@ -93,6 +93,18 @@ The following list covers all parameters that may be specified for the Associati
                                 not work, depending on your filesystem specifics
 ```
 
-
 ## Advanced Configuration
 Please refer to the [Advanced Configuration section of the QC Pipeline](https://github.com/ikmb/gwas-qc/#advanced-configuration) The same principles apply.
+
+## UK Biobank Proof-of-concept
+If you are directly working with UK Biobank's BGEN files, you may either convert them to VCF format and use the regular Assoc pipeline as described above. If you are merely interested in plain association testing with SAIGE and you are fine with leaving out all the additional features the full pipeline uses (Plink regression, Sample filtering, liftover/build conversion, etc.) you might want to look at our proof-of-concept script collection that we used for our recent COVID-19 analysis. It is not ready-to-use but should provide a solid foundation for your own scripts. Also, it currently relies on SLURM, SQLite3, Plink2 and Singularity to be installed on your HPC or workstation.
+
+In this example, you will need to extract the first 10 principal components, sex and age from the UK Biobank phenotype database and the phenotype from the recently-published COVID-19 test result table dumps. The script folder contains a `generate_annotations.sh` script to aid you in this process.
+
+1. Change the `env` file to suit your needs. You will also need to give a path to a single Plink dataset containing all genotype calls that you want in your SAIGE model. You might need to create it by merging the single-chromosome bim/bed/fams first.
+2. Run `1_prune.sh` to prepare the genotype calls for model generation
+3. Run `2_build_model.sh` to generate the SAIGE model. It also pulls the necessary SAIGE docker container. It might take a few days to complete.
+4. Run `3_saige_spa.sh` to perform association testing. It spawns a lot of SLURM jobs and generates a lot of temporary files in the current working directory
+5. Run `4_sumstats.sh` to collect all the result snippets into a single summary statistics text file that you may use for later analysis
+
+
