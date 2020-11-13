@@ -1,0 +1,26 @@
+
+# If you use modules, uncomment the following. 
+# Otherwise, specify the full path names in the respective variables
+
+module load singularity
+module load Plink2
+
+PLINK=plink
+SINGULARITY=singularity
+SQLITE3=sqlite3
+
+# Path to the basename of a Plink bim/bed/fam dataset containing all UKB genotype calls
+SOURCE=/path/to/ukb/genotype_calls.bim/bed/fam
+
+# Path to covariates, see documentation
+COVARFILE=covars.txt
+
+# Choose SAIGE version to use
+CONTAINER="docker://wzhou88/saige:0.40.1"
+
+# Choose chromosomes to process
+CHROMOSOMES="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22"
+
+# Path to UK Biobank BGEN files
+IMPUTED_DATA="/path/to/bgen/files"
+
