@@ -23,7 +23,7 @@ Please ensure that you have 16 GB RAM installed on the computer where you intend
 
 Fortunately, the association testing pipeline itself requires very little configuration. If you intend to run the pipeline on an HPC cluster, please review the advanced configuration items first.
 
-You will need:
+You will need to:
 - A set of `.vcf.gz` files with the following specifics:
     - at most one chromosome per `.vcf.gz` file. Multiple chromosomes per files are not supported. If a file happens to have multiple chromosomes, only the first will be analyzed.
     - any chromosome codes are supported (i.e. `chrX`, `X`, `23`, `chr23`, `chromosomeX` are just fine)
