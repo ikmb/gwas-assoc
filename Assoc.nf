@@ -115,7 +115,7 @@ tabix -p vcf !{vcf}
 
 # Gather lists of samples with proper double-ID handling
 bcftools query -l !{vcf} | sort >vcf-samples
-mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $2}' !{inc_fam} | sort >fam-samples
+gawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $2}' !{inc_fam} | sort >fam-samples
 
 # Keep only those samples that are in VCF and in FAM file
 comm -12 vcf-samples fam-samples >keep-samples
@@ -177,7 +177,7 @@ shell:
 '''
 cat r2-include.* >r2-include
 export TMPDIR=.
-mawk '$0 !~ /^chr/ {$1="chr"$1} {print}' r2-include | sort >r2-include.sorted
+gawk '$0 !~ /^chr/ {$1="chr"$1} {print}' r2-include | sort >r2-include.sorted
 '''
 }
 
@@ -199,11 +199,11 @@ shell:
 '''
 # Generate double-id FAM
 MEM=!{task.memory.toMega()-1000}
-mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
+gawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
 /opt/plink2 --vcf !{vcf} --const-fid --memory $MEM --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --output-chr chrM --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
 
 mv !{params.collection_name}.!{chrom}.bim old_bim
-mawk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
+gawk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
 
 # Might need some "chr" prefixing here
 '''
@@ -432,7 +432,7 @@ case $CHR in
         EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR --sampleFile_male=males.txt"
 
         # Make list of males with double-ID
-        mawk '{if($1!="0") {$2=$1"_"$2; $1="0";}  if($5=="1") {print $2}}' !{inc_fam} >males.txt
+        awk '{if($1!="0") {$2=$1"_"$2; $1="0";}  if($5=="1") {print $2}}' !{inc_fam} >males.txt
         ;;
     *)
         EXTRA_ARGS=""
@@ -461,7 +461,7 @@ step2_SPAtests.R \
 
 
 # add odds ratio
-<temp.stats mawk 'NR==1{print $0 " OR";next} {print $0 " " exp($10)}' \
+<temp.stats awk 'NR==1{print $0 " OR";next} {print $0 " " exp($10)}' \
     >"!{chrom}.!{chunk.name}.SAIGE.stats"
 '''
 }
@@ -492,7 +492,7 @@ while read -r line; do
 done <allfiles
 
 
-<tmp mawk 'NR==1{print} NR>1{if(substr($1,1,3)!="chr"){$1="chr"$1} $3=$1":"$2":"$4":"$5; print}' >>!{params.collection_name}.SAIGE.stats
+<tmp gawk 'NR==1{print} NR>1{if(substr($1,1,3)!="chr"){$1="chr"$1} $3=$1":"$2":"$4":"$5; print}' >>!{params.collection_name}.SAIGE.stats
 
 '''
 }
@@ -515,7 +515,7 @@ VCF=!{gz}
 TARGET=!{chrom}.PLINKdosage
 
 # Theoratically, gawk or awk would also work but are much slower
-AWK=mawk
+AWK=gawk
 BGZIP=bgzip
 
 FIFO=$TARGET.fifo
@@ -654,7 +654,7 @@ process make_saige_covars {
     shell:
 '''
 # Re-format sample ID and family ID to VCF rules
-mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{inc_fam}  | sort >new-fam
+gawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{inc_fam}  | sort >new-fam
 
 # Also re-format, but keep evec header
 # mawk 'NR==1{print $0;next} {if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' {in_covars}  | sort >evec
@@ -662,10 +662,10 @@ mawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{inc_fam}  | sort >new-fam
 # Take evec file as a whole, SAIGE does not care about additional columns.
 # Filter evec file according to samples contained in FAM (if not already done)
 
-mawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(12);i++) {printf "%s%s", $i, (i<12?OFS:ORS)}}}' new-fam !{evec} >filtered-evec
+gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(12);i++) {printf "%s%s", $i, (i<12?OFS:ORS)}}}' new-fam !{evec} >filtered-evec
 
 if [ -f "!{params.more_covars}" ]; then
-    mawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(6);i++) {printf "%s%s", $i, (i<6?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
+    gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(6);i++) {printf "%s%s", $i, (i<6?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
     cut -f3-6 !{params.more_covars} >covars-column
     < filtered-covars cut -f3-6 -d" " >>covars-column
 fi
@@ -683,7 +683,7 @@ cat filtered-evec >>evec.double-id.withheader
 
 # Take phenotype info from FAM, translate to SAIGE-encoding
 echo "Pheno" >pheno-column
-<new-fam  mawk '{if($6=="2") {$6="1";} else if($6=="1") {$6="0";} print $6}' >>pheno-column
+<new-fam  gawk '{if($6=="2") {$6="1";} else if($6=="1") {$6="0";} print $6}' >>pheno-column
 
 mv new-fam !{params.collection_name}.double-id.fam
 
@@ -743,7 +743,7 @@ shell:
 # extract first line, convert tabs to space
 head -n1 !{stats[0]} | tr -s '\t ' ' ' | xargs >!{params.collection_name}.Plink.stats
 
-ls !{stats} | sort -n | xargs -n1 tail -n +2 | mawk '{if(substr($1,1,3)!="chr"){$1="chr"$1} $2=$1":"$3":"$4":"$5; print}'>>!{params.collection_name}.Plink.stats
+ls !{stats} | sort -n | xargs -n1 tail -n +2 | gawk '{if(substr($1,1,3)!="chr"){$1="chr"$1} $2=$1":"$3":"$4":"$5; print}'>>!{params.collection_name}.Plink.stats
 '''
 }
 
@@ -804,7 +804,7 @@ fi
 
 # Create UCSC BED file from BIM
 # Columns: chrX pos-1 pos rsID
-<!{bim} mawk '{ print $1, $4-1, $4, $4, $2 }' \\
+<!{bim} gawk '{ print $1, $4-1, $4, $4, $2 }' \\
     | sed 's/^chr23/chrX/' \\
     | sed 's/^chr24/chrY/' \\
     | sed 's/^chr25/chrX/' \\
@@ -814,14 +814,14 @@ fi
 $LIFTOVER prelift.bed $CHAIN postlift.bed unmapped.bed
 
 # Generate exclude list for unmapped variants
-<unmapped.bed mawk '$0~/^#/{next} {print $5}' >unmapped-variants &
+<unmapped.bed gawk '$0~/^#/{next} {print $5}' >unmapped-variants &
 
 # Generate update-pos list for Plink, exclude double variants
-<postlift.bed mawk '{print $5,$3}' >new-pos &
+<postlift.bed gawk '{print $5,$3}' >new-pos &
 
 wait
 
-<postlift.bed mawk '{if($1 != "chr!{chrom}" && $1 != "!{chrom}") {print $5}}' >chromosome-switchers &
+<postlift.bed gawk '{if($1 != "chr!{chrom}" && $1 != "!{chrom}") {print $5}}' >chromosome-switchers &
 <new-pos sort | uniq -d | cut -f1 -d" ">duplicates &
 
 wait
@@ -834,7 +834,7 @@ cat chromosome-switchers >>duplicates
 
 plink --bfile ${BASENAME}.tmp --memory $MEM --merge-x no-fail --make-bed --out ${BASENAME}
 mv ${BASENAME}.bim tmp
-mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
+gawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
 mv postlift.bed postlift.!{chrom}
 '''
 }
@@ -873,7 +873,7 @@ FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | head -n1)
 module load Plink/1.9
 plink --bfile $FIRSTNAME --memory $MEM --threads 4 --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}_lifted_b$NEWBUILD
 mv !{params.collection_name}_lifted_b${NEWBUILD}.bim tmp
-mawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}_lifted_b${NEWBUILD}.bim
+gawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >!{params.collection_name}_lifted_b${NEWBUILD}.bim
 '''
 }
 
