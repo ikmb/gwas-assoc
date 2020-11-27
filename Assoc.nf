@@ -689,11 +689,11 @@ mv new-fam !{params.collection_name}.double-id.fam
 
 # Merge both, replace space runs with single tabs for SAIGE
 touch covars-column
-if [ -f "!{params.more_covars}" ]; then
-    echo PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC6,PC7,PC8,PC9,PC10,!{params.more_covars_cols} >!{params.collection_name}.covar_cols
-else
-    echo PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC6,PC7,PC8,PC9,PC10 >!{params.collection_name}.covar_cols
 
+if [ ! -d "!{params.more_covars}" ]; then
+    echo PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,!{params.more_covars_cols} >!{params.collection_name}.covar_cols
+else
+    echo PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10 >!{params.collection_name}.covar_cols
 fi
 
 paste -d" " evec.double-id.withheader pheno-column covars-column | tr -s ' ' \\\\t >!{params.collection_name}.covars
