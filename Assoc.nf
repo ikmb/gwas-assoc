@@ -665,9 +665,9 @@ gawk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{inc_fam}  | sort >new-fam
 gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(12);i++) {printf "%s%s", $i, (i<12?OFS:ORS)}}}' new-fam !{evec} >filtered-evec
 
 if [ -f "!{params.more_covars}" ]; then
-    gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(6);i++) {printf "%s%s", $i, (i<6?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
-    cut -f3-6 !{params.more_covars} >covars-column
-    < filtered-covars cut -f3-6 -d" " >>covars-column
+    gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(NF);i++) {printf "%s%s", $i, (i<NF?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
+    cut -f3- !{params.more_covars} >covars-column
+    < filtered-covars cut -f3- -d" " >>covars-column
 fi
 
 EVEC_LINES=$(wc -l <filtered-evec)
