@@ -438,6 +438,13 @@ case $CHR in
         EXTRA_ARGS=""
 esac
 
+# Check whether males are present / SAIGE cannot deal otherwise.  
+
+if [ -s males.txt ]; then
+   EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR
+fi
+
+
 export R_LIBS_USER=/dev/null
 
 step2_SPAtests.R \
