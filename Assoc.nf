@@ -299,21 +299,39 @@ flashpca2 -d 10 --bfile !{bim.baseName} --memory $MEM --numthreads 16 --outload 
 }
 
 
+//params.min_samplesize=1000
+//params.fam_length=inc_fam.countLines()
+
+def check_fam_for_saige(file) {
+	def lines = file.readLines()
+        int x = 0
+        int y = 0	
+lines.each { String line ->
+  if(line.split(" |\t")[5] == "2") x++
+  if(line.split(" |\t")[5] == "1") y++
+
+}
+ return(x > 50 && y > 50)
+
+}
+params.fam_length=check_fam_for_saige(inc_fam)
+
+if(params.fam_length){
 /* Create a SAIGE null model from b38 Plink build and PCs */
 process saige_null {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    container "docker://wzhou88/saige:0.42.1"
+    container "docker://wzhou88/saige:0.43.2"
     cpus 16
     label 'long_running'
 
     input:
     tuple file(bed), file(bim), file(fam), file(logfile) from for_saige_null
     tuple file(pheno), file(covar_list) from for_saige_null_covars
-
+    
     output:
     tuple file("${params.collection_name}.rda"), file("${params.collection_name}.varianceRatio.txt") into for_saige_assoc, nulldump
-
+   	
 shell:
     '''
 
@@ -353,6 +371,8 @@ step1_fitNULLGLMM.R \
 //params.saige_chunk_size = 50
 params.saige_chunk_size = 20000
 
+
+
 process split_vcf_ranges {
     tag "${params.collection_name}.${chrom}"
     input:
@@ -374,8 +394,9 @@ testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2]
 
 /* Perform SAIGE Assoc test on imputed VCFs */
 process saige_assoc {
+    scratch true //For IO processes on cluster
     tag "${params.collection_name}.${chrom}.${chunk}"
-    container "docker://wzhou88/saige:0.42.1"
+    container "docker://wzhou88/saige:0.43.2"
     label 'long_running'
     input:
     // <-- single VCF and chromosome number
@@ -386,7 +407,7 @@ process saige_assoc {
 
     output:
     file("${chrom}.${chunk.name}.SAIGE.stats") into for_merge_sumstats
-
+    
 shell:
 '''
 FIRSTPOS=$(head -n1 <!{chunk})
@@ -477,6 +498,7 @@ step2_SPAtests.R \
 //for_merge_sumstats.collect().dump()
 
 process merge_saige_results {
+    scratch true
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
     input:
@@ -503,9 +525,10 @@ done <allfiles
 
 '''
 }
-
+}
 
 process extract_dosage {
+    scratch true
     tag "${params.collection_name}.${chrom}"
     label 'long_running'
 
@@ -641,8 +664,6 @@ rm -f $FIFO
 '''
 }
 
-
-
 /* Create SAIGE-compatible covars from PCA eigenvectors */
 process make_saige_covars {
 
@@ -713,7 +734,7 @@ process plink_assoc {
     tag "${params.collection_name}.${chrom}"
     label 'long_running'
     label 'big_mem'
-
+    scratch true
     input:
     tuple file(dosagemap), file(dosage), val(chrom) from for_plink
     tuple file(pheno), file(cols) from for_plink_covars
@@ -1036,7 +1057,7 @@ mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
 '''
 }
 
-
+if(params.fam_length){
 process lift_saige_sumstats {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
@@ -1070,4 +1091,4 @@ mv !{sumstats}.b37 !{sumstats}.lifted.${NEWBUILD}
 mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
 '''
 }
-
+}
