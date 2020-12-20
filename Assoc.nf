@@ -321,7 +321,7 @@ if(params.fam_length){
 process saige_null {
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
-    container "docker://wzhou88/saige:0.43.2"
+    container "docker://wzhou88/saige:0.42.1"
     cpus 16
     label 'long_running'
 
@@ -394,9 +394,9 @@ testdump.transpose().combine(nulldump.toList()).map{ it -> [ it[0], it[1], it[2]
 
 /* Perform SAIGE Assoc test on imputed VCFs */
 process saige_assoc {
-    scratch true //For IO processes on cluster
+    scratch true
     tag "${params.collection_name}.${chrom}.${chunk}"
-    container "docker://wzhou88/saige:0.43.2"
+    container "docker://wzhou88/saige:0.42.1"
     label 'long_running'
     input:
     // <-- single VCF and chromosome number
@@ -462,7 +462,7 @@ esac
 # Check whether males are present / SAIGE cannot deal otherwise.  
 
 if [ -s males.txt ]; then
-   EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR
+   EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR"
 fi
 
 
@@ -498,7 +498,6 @@ step2_SPAtests.R \
 //for_merge_sumstats.collect().dump()
 
 process merge_saige_results {
-    scratch true
     tag "${params.collection_name}"
     publishDir params.output, mode: 'copy'
     input:
