@@ -454,16 +454,14 @@ case $CHR in
 
         # Make list of males with double-ID
         awk '{if($1!="0") {$2=$1"_"$2; $1="0";}  if($5=="1") {print $2}}' !{inc_fam} >males.txt
-        ;;
+        if [ ! -s males.txt ]; then
+	   EXTRA_ARGS=""
+	fi
+        
+;;
     *)
         EXTRA_ARGS=""
 esac
-
-# Check whether males are present / SAIGE cannot deal otherwise.  
-
-if [ -s males.txt ]; then
-   EXTRA_ARGS="--is_rewrite_XnonPAR_forMales=TRUE --X_PARregion=$XPAR"
-fi
 
 
 export R_LIBS_USER=/dev/null
