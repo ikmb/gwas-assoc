@@ -67,6 +67,15 @@ if [ "!{params.more_covars}" != "." ] && [ -f "!{params.more_covars}" ] && [ "!{
     ERROR=1
 fi
 
+# test if selected covars are available in provided covars file
+if [ "!{params.more_covars}" != "." ] && [ -f "!{params.more_covars}" ]; then
+    
+    head -n1 "!{params.more_covars}" | gawk 'BEGIN { split("'"!{params.more_covars_cols}"'",cols,",") } { for (c in cols) { found=0; for (i=3; i<=NF; i++) { if ($i == cols[c]) {found=1; break} }; if (found==0) exit 1 }}'
+    if [[ $? == 1 ]]; then
+        echo "At least one covar column specified in --more_covars_cols is not found in provided covariate file." >/dev/stderr
+        ERROR=1
+    fi
+fi
 
 # Genome build
 case "!{params.build}" in
@@ -691,10 +700,15 @@ gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(12);i++) {print
 
 if [ -f "!{params.more_covars}" ]; then
     gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(NF);i++) {printf "%s%s", $i, (i<NF?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
+    
+    # identify column indices of selected covars
+    # NOTE: We checked above that all selected columns are available, so the list won't be empty
+    COLSTR=$(head -n1 "!{params.more_covars}"  | gawk 'BEGIN { split("'"!{params.more_covars_cols}"'",cols,","); colstr="" } { for (c in cols) { for (i=3; i<=NF; i++) { if ($i == cols[c]) {colstr=colstr "," i} }}} END { print substr(colstr,2) }')
+    
     # extract header
-    cut -f3- !{params.more_covars} | head -n1 >covars-column
+    cut -f$COLSTR !{params.more_covars} | head -n1 >covars-column
     # fill values
-    cut -f3- -d" " filtered-covars >>covars-column
+    cut -f$COLSTR -d" " filtered-covars >>covars-column
 fi
 
 EVEC_LINES=$(wc -l <filtered-evec)
