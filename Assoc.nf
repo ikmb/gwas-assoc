@@ -691,8 +691,10 @@ gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(12);i++) {print
 
 if [ -f "!{params.more_covars}" ]; then
     gawk 'FNR==NR{samples[$2];next} {if($2 in samples) { for(i=1;i<=(NF);i++) {printf "%s%s", $i, (i<NF?OFS:ORS)}}}' new-fam !{params.more_covars} | sort >filtered-covars
-    cut -f3- !{params.more_covars} >covars-column
-    < filtered-covars cut -f3- -d" " >>covars-column
+    # extract header
+    cut -f3- !{params.more_covars} | head -n1 >covars-column
+    # fill values
+    cut -f3- -d" " filtered-covars >>covars-column
 fi
 
 EVEC_LINES=$(wc -l <filtered-evec)
