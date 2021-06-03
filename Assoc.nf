@@ -320,8 +320,8 @@ lines.each { String line ->
   if(line.split(" |\t")[5] == "1") y++
 
 }
- return(x > 50 && y > 50)
-
+ //return(x > 50 && y > 50)
+ return true 
 }
 params.fam_length=check_fam_for_saige(inc_fam)
 
