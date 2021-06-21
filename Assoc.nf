@@ -980,7 +980,7 @@ fi
     | sed 's/^chr23/chrX/' \\
     | sed 's/^chr24/chrY/' \\
     | sed 's/^chr25/chrX/' \\
-    | sed 's/^chr26/chrMT/' >prelift.bed
+    | sed 's/^chr26/chrMT/' \\
     | sed 's/^23/chrX/' \\
     | sed 's/^24/chrY/' \\
     | sed 's/^25/chrX/' \\
