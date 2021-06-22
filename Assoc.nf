@@ -475,6 +475,9 @@ esac
 
 export R_LIBS_USER=/dev/null
 
+# workaround: for now, do not apply SAIGE to chrX or Y
+if [[ $CHR != 23 && $CHR != X && $CHR != chr23 && $CHR != chrX && $CHR != 24 && $CHR != Y && $CHR != chr24 && $CHR != chrY ]]; then
+
 step2_SPAtests.R \
     --vcfFile="!{vcf}" \
     --vcfFileIndex="!{tbi}" \
@@ -498,6 +501,9 @@ step2_SPAtests.R \
 # add odds ratio
 <temp.stats awk 'NR==1{print $0 " OR";next} {print $0 " " exp($10)}' \
     >"!{chrom}.!{chunk.name}.SAIGE.stats"
+
+fi
+
 '''
 }
 
