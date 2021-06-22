@@ -866,7 +866,16 @@ $LIFTOVER prelift.bed $CHAIN postlift.bed unmapped.bed
 
 wait
 
-<postlift.bed gawk '{if($1 != "chr!{chrom}" && $1 != "!{chrom}") {print $5}}' >chromosome-switchers &
+if [[ !{chrom} < 23 ]]; then
+    <postlift.bed gawk '{if($1 != "chr!{chrom}" && $1 != "!{chrom}") {print $5}}' >chromosome-switchers &
+elif [[ !{chrom} == 23 || !{chrom} == 25 ]]; then
+    <postlift.bed gawk '{if($1 != "chr23" && $1 != "23" && $1 != "chrX" && $1 != "X" && $1 != "chr25" && $1 != "25") {print $5}}' >chromosome-switchers &
+elif [[ !{chrom} == 24 ]]; then
+    <postlift.bed gawk '{if($1 != "chr24" && $1 != "24" && $1 != "chrY" && $1 != "Y") {print $5}}' >chromosome-switchers &
+elif [[ !{chrom} == 26 ]]; then
+    <postlift.bed gawk '{if($1 != "chr26" && $1 != "26" && $1 != "chrMT" && $1 != "MT") {print $5}}' >chromosome-switchers &
+fi
+
 <new-pos sort | uniq -d | cut -f1 -d" ">duplicates &
 
 wait
