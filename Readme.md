@@ -107,6 +107,14 @@ In this example, you will need to extract the first 10 principal components, sex
 4. Run `3_saige_spa.sh` to perform association testing. It spawns a lot of SLURM jobs and generates a lot of temporary files in the current working directory
 5. Run `4_sumstats.sh` to collect all the result snippets into a single summary statistics text file that you may use for later analysis
 
+## Citation instructions
+
+If you use our software in any published work, please cite our BIGwas software and methods paper: 
+
+Kässens JC, Wienbrandt L, Ellinghaus D. BIGwas: Single-command quality control
+and association testing for multi-cohort and biobank-scale GWAS/PheWAS data.
+Gigascience. 2021 Jun 29;10(6):giab047.
+
 ## License
 MIT License
 
