@@ -27,7 +27,7 @@ You will need to:
 - A set of `.vcf.gz` files with the following specifics:
     - at most one chromosome per `.vcf.gz` file. Multiple chromosomes per files are not supported. If a file happens to have multiple chromosomes, only the first will be analyzed.
     - any chromosome codes are supported (i.e. `chrX`, `X`, `23`, `chr23`, `chromosomeX` are just fine)
-    - your VCF files require dosage data (DS tag) for imputed data or genotype calls (GT tag) for genotyped data. If both tags are found, DS is chosen.
+    - **your VCF files require dosage data (DS tag) for imputed data or genotype calls (GT tag) for genotyped data. If both tags are found, DS is chosen.**
     - the `INFO` column in the VCF files should contain an imputation score. This is used to filter the input variants to create a good null model for SAIGE. For topmed imputations, we found `R2>0.8` to yield good results. If the given tag is not found in the VCF file, the default value 1.0 is assumed, making all variants pass the filter. This filter is not used for Plink-based association testing. 
 - A FAM file to update sex and phenotype from. Only those files in the FAM file will be used from the VCFs. Note that *all* samples from the FAM file must be present in the VCF files. **Note: if the FAM family ID is 0, the sample name in the VCF should be the individual ID. If the FID is not 0, the sample name should be the family ID and the individual ID with an underscore (i.e. FID 1234 IID 9876 should be 1234_9876 in the VCF file)**
 - The genome build of the input data, which will result in SAIGE handling the sex chromosomes according to the coordinates of the pseudoautosomal regions. Possible values are 37 and 38.
