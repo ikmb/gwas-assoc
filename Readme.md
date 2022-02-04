@@ -10,10 +10,20 @@
 
 Please ensure that you have 16 GB RAM installed on the computer where you intend to run the pipeline (i.e. your local computer or your HPC compute nodes).
 
+**Note:** As we have a current issue with the hoster of our Singularity container, you need to download the container yourself and configure the path to the container before the first run of Nextflow. If you have run the [Quality Control Pipeline](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start) you already have a running setup and you are fine. (Btw, the process is similar to setting up a shared singularity cache. See [Advanced Configuration](https://github.com/ikmb/gwas-qc/#shared-singularity-cache).)
+```
+cd /some/place/for/your/container
+wget https://hybridcomputing.ikmb.uni-kiel.de/downloads/lwienbrandt-ikmb-gwas-qc-assoc-assets.sif
+```
+Then, add/modify the following key in your `~/.nextflow/config` (if the file does not exist, create it):
+```
+singularity.cacheDir = "/some/place/for/your/container"
+```
+
 ## Quick Start
 
-1. Run the [Quality Control Pipeline on the example](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start) first
-    - all files necessary for the association testing pipeline are automatically generated
+1. Run the [Quality Control Pipeline](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start) on the example first.
+    - All files necessary for the association testing pipeline are automatically generated.
 2. Run the wrapper script (included in example package): `bash run-assoc.sh`
 
 
