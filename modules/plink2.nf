@@ -1,0 +1,59 @@
+process prune {
+    //tag "${params.collection_name}"
+    label 'plink2'
+	scratch params.scratch
+    publishDir params.output, mode: 'copy'
+
+    input:
+    	tuple path(bed), path(bim), path(fam), path(logfile)
+    	path(r2)
+		path("include-r2-variants")
+
+    output:
+    	tuple file("${params.collection_name}.pruned.bed"), file("${params.collection_name}.pruned.bim"), file("${params.collection_name}.pruned.fam"), file("${params.collection_name}.pruned.log")// into for_saige_null, for_liftover_pruned, for_generate_pcs
+
+	shell:
+'''
+echo Generating PCA SNP List file for variant selection
+R2=!{r2}
+MEM=!{task.memory.toMega()-1000}
+if [ ! -s $R2 ]; then
+    # No entries in include list. This means that either we have genotyped-only
+    # data where no R2 score is present or the filter is malformed. We're assuming
+    # genotyped-only data here. In this case, populate the r2 list.
+    cut -f2 -d" " !{bim} | sort >new-r2
+    R2=new-r2
+fi
+plink2 --memory $MEM --threads !{task.cpus} --bed !{bed} --bim !{bim} --fam !{fam} --extract $R2 --indep-pairwise 50 5 0.2 --out _prune
+plink2 --memory $MEM --threads !{task.cpus} --bed !{bed} --bim !{bim} --fam !{fam} --extract _prune.prune.in --maf 0.05 --make-bed --out intermediate
+plink2 --memory $MEM --threads !{task.cpus} --bfile intermediate --chr 1-22 --extract include-r2-variants --output-chr chrM --make-bed --out !{params.collection_name}.pruned
+rm intermediate*
+'''
+}
+
+process make_plink {
+    label "plink2"
+	scratch params.scratch
+    tag "${params.collection_name}.$chrom"
+
+    input:
+    tuple path(vcf), path(tbi), val(chrom), val(filetype)
+    each path(fam)
+
+    output:
+    tuple path("${params.collection_name}.${chrom}.bed"), path("${params.collection_name}.${chrom}.bim"), path("${params.collection_name}.${chrom}.fam"), path("${params.collection_name}.${chrom}.log"),val(chrom) //into for_liftover, for_merge_b38
+
+shell:
+'''
+# Generate double-id FAM
+MEM=!{task.memory.toMega()-1000}
+#this was gawk originally:
+awk '{if($1!="0") {$2=$1"_"$2; $1="0";} print $0}' !{fam} >new-fam
+plink2 --vcf !{vcf} --const-fid --memory $MEM --allow-no-sex --pheno new-fam --mpheno 4 --update-sex new-fam 3 --output-chr chrM --make-bed --keep-allele-order --out !{params.collection_name}.!{chrom}
+mv !{params.collection_name}.!{chrom}.bim old_bim
+#this was gawk originally:
+awk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params.collection_name}.!{chrom}.bim
+# Might need some "chr" prefixing here
+'''
+}
+

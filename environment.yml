@@ -1,0 +1,15 @@
+# You can use this file to create a conda environment for this pipeline:
+#   conda env create -f environment.yml
+name: gwas-assoc-dsl2
+channels:
+  - biobakery
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - gawk
+  - mawk
+  - perl
+  - samtools
+  - bcftools
+  - htslib
