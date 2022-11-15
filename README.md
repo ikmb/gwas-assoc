@@ -1,6 +1,6 @@
 ![](images/ikmb_bfx_logo.png)
 
-# Pipeline
+# IKMB GWAS Association Testing Pipeline
 
 ## Documentation 
 
