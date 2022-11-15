@@ -35,7 +35,7 @@ process split_vcf_ranges {
     bcftools query -f "%POS\\n" !{vcf} >positions
     bcftools view -H !{vcf} > viewed
 	head viewed -n1 | cut -f9 >field
-    split -a 8 -l !{params.saige_chunk_size} positions '0' #-d --suffix-length=8 --lines=!{params.saige_chunk_size}
+    split -d -a 8 -l !{params.saige_chunk_size} positions '0' #-d --suffix-length=8 --lines=!{params.saige_chunk_size}
     '''
 }
 

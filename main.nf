@@ -4,13 +4,13 @@ nextflow.enable.dsl=2
 
 /**
 ===============================
-Pipeline
+IKMB GWAS Association Testing Pipeline
 ===============================
 
-This Pipeline performs ....
+This Pipeline performs Association Testing for GWAS on QC'ed (and imputed) chromosome-wise genotyping data in vcf.gz format.
 
 ### Homepage / git
-git@github.com:ikmb/pipeline.git
+git@github.com:ikmb/gwas-assoc.git
 
 **/
 
@@ -19,6 +19,9 @@ git@github.com:ikmb/pipeline.git
 params.version = workflow.manifest.version
 
 run_name = ( params.run_name == false) ? "${workflow.sessionId}" : "${params.run_name}"
+
+
+
 
 include { assoc } from './workflows/main' params(params)
 

@@ -28,8 +28,10 @@ include { merge_saige_results;
           merge_plink_results;
           merge_r2
         } from '../modules/merge_processes.nf'
+		
 include {regenie_step1;
-		 regenie_step2 } from '../modules/regenie.nf'
+		 regenie_step2;
+		 phenofile_from_fam } from '../modules/regenie.nf'
 
 include { prune_python_helper } from '../modules/python2.nf'
 include { lift_plink_sumstats } from '../modules/liftsumstats.nf'
@@ -81,6 +83,7 @@ workflow assoc{
 	extract_dosage( ch_mapped_prefilter )
 
 	gen_r2_list( ch_mapped_prefilter )
+
 	merge_r2( gen_r2_list.out.collect() )
 
 	make_plink ( ch_mapped_prefilter,
@@ -94,20 +97,20 @@ workflow assoc{
 	prune( merge_plink.out,
 		   merge_r2.out,
 		   prune_python_helper.out )
-
+//LIFTOVER
 	liftover_pruned( prune.out )
-	
+//FLASHPCA2
 	generate_pcs( prune.out )
 
 	make_saige_covars( generate_pcs.out,
 					   Channel.fromPath(params.fam) )
-
+//PLINK
 	plink_assoc( extract_dosage.out.combine(make_saige_covars.out.for_plink ) )
 
 	merge_plink_results( plink_assoc.out.collect() )
 
 //LIFTOVER
-	if(params.ucsc_liftover != "" ){
+	if(params.ucsc_liftover != "" && !params.disable_liftover){
 		liftover( make_plink.out )
 
 		merge_plink_lifted( liftover.out.mergelifted )
@@ -133,12 +136,22 @@ workflow assoc{
 	}
 
 //REGENIE
+	if(!params.disable_regenie){
+		if(params.phenofile){
+			//TODO: check if phenofile exist
+			ch_pheno = Channel.fromPath(params.phenofile)
+		}else{
+			phenofile_from_fam( Channel.fromPath(params.fam) )
+			ch_pheno = phenofile_from_fam.out
+		}
 
-	if(params.regenie){
 		regenie_step1( prune.out,
-					   make_saige_covars.out.covars	)
+					   make_saige_covars.out.covars,
+					   ch_pheno )
+
 		regenie_step2( prune.out,
 					   make_saige_covars.out.covars,
-					   regenie_step1.out )
+					   regenie_step1.out,
+					   ch_pheno )
 	}
 }

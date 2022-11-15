@@ -56,4 +56,3 @@ awk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params
 # Might need some "chr" prefixing here
 '''
 }
-

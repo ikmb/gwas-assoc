@@ -6,11 +6,11 @@ process liftover_pruned {
 	scratch params.scratch
 
     input:
-    tuple path(bed), path(bim), path(fam), path(logfile) 
+        tuple path(bed), path(bim), path(fam), path(logfile) 
     output:
-    tuple path("${params.collection_name}.pruned_lifted*.bed"), path("${params.collection_name}.pruned_lifted*.bim"), path("${params.collection_name}.pruned_lifted*.fam"), path("${params.collection_name}.pruned_lifted*.log"), optional: true //emit: outputcollection,
+        tuple path("${params.collection_name}.pruned_lifted*.bed"), path("${params.collection_name}.pruned_lifted*.bim"), path("${params.collection_name}.pruned_lifted*.fam"), path("${params.collection_name}.pruned_lifted*.log"), optional: true //emit: outputcollection,
     //file "postlift.${chrom}" into for_merge_lift
-shell:
+    shell:
 '''
 module load Plink/1.9
 MEM=!{task.memory.toMega()-1000}

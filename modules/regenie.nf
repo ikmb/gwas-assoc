@@ -1,21 +1,32 @@
+process phenofile_from_fam {
+    tag "${params.collection_name}"
+	scratch params.scratch
+    label 'base'
 
+    input:
+        path(assocfam)
+    output:
+        path('phenotype.txt')
+   	
+    shell:
+    '''
+    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    '''
+}
 
 process regenie_step1 {
     tag "${params.collection_name}"
-    publishDir params.output, mode: 'copy'
-	//scratch params.scratch
-    scratch false
+	scratch params.scratch
     label 'regenie'
 
     input:
-    tuple path(bed), path(bim), path(fam), path(logfile)// from for_saige_null
-    tuple path(covars), path(covars_cols)// from for_saige_null_covars
-    
+        tuple path(bed), path(bim), path(fam), path(logfile)
+        tuple path(covars), path(covars_cols)
+        path(phenofile)
     output:
-    //tuple path("${params.collection_name}.rda"), path("${params.collection_name}.varianceRatio.txt") //into for_saige_assoc, nulldump
-    tuple path('fit_bin_out_*.loco*'), path('fit_bin_out_pred.list')
+        tuple path('fit_bin_out_*.loco*'), path('fit_bin_out_pred.list')
    	
-shell:
+    shell:
     '''
 sed 's/^chr//' !{bim.baseName}.bim >tmp.bim
 
@@ -32,15 +43,13 @@ else
     exit 1
 fi
 
-awk -F '\t' 'NR==1  {print "FID\tIID\tPhenotype"}{gsub(/"/,""); print $1,$2,$6}' !{fam} > phenotype.txt
-
 regenie \
   --step 1 \
   --bed tmp \
   --covarFile !{covars} \
   --covarCol PC{1:!{params.pca_dims}} \
-  --phenoFile phenotype.txt \
-  --phenoCol "Phenotype" \
+  --phenoFile !{phenofile} \
+  --use-relative-path \
   --bsize 100 \
   $TRAIT_ARGS \
    --lowmem \
@@ -49,31 +58,25 @@ regenie \
   --gz
     '''
 }
-
+//--phenoCol "Phenotype" \
 
 process regenie_step2 {
-    //scratch params.scratch
-    scratch false
+    scratch params.scratch
     tag "${params.collection_name}"
     label 'regenie'
+    publishDir params.output, mode: 'copy'
+
 
     input:
-    // <-- single VCF and chromosome number
-//    tuple file(vcf), file(tbi), val(chrom), val(filetype),file(chunk) from for_saige_assoc_imp.transpose() // turn [chr1, [chunk1, chunk2, chunk3]] into [chr1, chunk1], [chr1, chunk2], [chr1, chunk3]
-//    tuple file(modelfile), file(varratio) from for_saige_assoc
-    
-    
-    //tuple file(vcf), file(tbi), file(field), val(chrom), val(filetype), file(chunk), file(modelfile), file(varratio)// from saige_jobs
-    tuple path(bed), path(bim), path(fam), path(logfile)// from for_saige_null
-    
-    //each path(inc_fam)
-
-    tuple path(covars), path(covars_cols)// from for_saige_null_covars
-    tuple path(locofiles), path(predlist)
+        tuple path(bed), path(bim), path(fam), path(logfile)
+        tuple path(covars), path(covars_cols)
+        tuple path(locofiles), path(predlist)
+        path(phenofile)
     output:
-    //file("${chrom}.${chunk.name}.SAIGE.stats")// into for_merge_sumstats
+        path("${params.collection_name}_regenie_firth*")
     
-shell:
+    shell:
+        outprefix = params.collection_name + '_regenie_firth'
 '''
 if [ "!{params.trait}" == "binary" ]; then
     TRAIT_ARGS="--bt --cc12"
@@ -90,20 +93,19 @@ sed 's/^chr//' !{bim.baseName}.bim >tmp.bim
 ln -s !{bed} tmp.bed
 ln -s !{fam} tmp.fam
 
-awk -F '\t' 'NR==1  {print "FID\tIID\tPhenotype"}{gsub(/"/,""); print $1,$2,$6}' !{fam} > phenotype.txt
-
 regenie \
   --step 2 \
   --bed tmp \
   --covarFile !{covars} \
   --covarCol PC{1:!{params.pca_dims}} \
-  --phenoFile phenotype.txt \
+  --phenoFile !{phenofile} \
   --bsize 200 \
   $TRAIT_ARGS \
   --firth --approx \
   --pThresh 0.01 \
   --pred !{predlist} \
-  --out test_bin_out_firth \
+  --out !{outprefix} \
+  !{params.additional_regenie_parameter} \
   --gz
 '''
 }
