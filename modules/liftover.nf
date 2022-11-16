@@ -146,4 +146,3 @@ gawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
 mv postlift.bed postlift.!{chrom}
 '''
 }
-

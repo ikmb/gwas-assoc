@@ -10,7 +10,8 @@ process phenofile_from_fam {
    	
     shell:
     '''
-    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    #gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print $1"\t"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
     '''
 }
 
@@ -52,8 +53,10 @@ regenie \
   --use-relative-path \
   --bsize 100 \
   $TRAIT_ARGS \
-   --lowmem \
+  --lowmem \
+  --loocv	\
   --lowmem-prefix tmp_rg \
+  !{params.additional_regenie_parameter} \
   --out fit_bin_out \
   --gz
     '''
@@ -103,6 +106,7 @@ regenie \
   $TRAIT_ARGS \
   --firth --approx \
   --pThresh 0.01 \
+  --loocv	\
   --pred !{predlist} \
   --out !{outprefix} \
   !{params.additional_regenie_parameter} \

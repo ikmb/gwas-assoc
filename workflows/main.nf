@@ -14,7 +14,8 @@ include { prune;
           make_plink } from '../modules/plink2.nf'
 
 include { liftover_pruned;
-          liftover } from '../modules/liftover.nf'
+          liftover 
+		} from '../modules/liftover.nf'
 
 include { gen_r2_list;
           split_vcf_ranges } from '../modules/bcftools.nf'
@@ -34,7 +35,8 @@ include {regenie_step1;
 		 phenofile_from_fam } from '../modules/regenie.nf'
 
 include { prune_python_helper } from '../modules/python2.nf'
-include { lift_plink_sumstats } from '../modules/liftsumstats.nf'
+include { lift_plink_sumstats;
+		  lift_saige_sumstats } from '../modules/liftsumstats.nf'
 
 //function definitions
 def get_file_details(filename) {
@@ -133,7 +135,15 @@ workflow assoc{
 
 		merge_saige_results( saige_assoc.out.collect(),
 							 make_saige_covars.out.covars )
+
+		//lift only when liftover was activated
+		if(params.ucsc_liftover != "" && !params.disable_liftover){
+			lift_saige_sumstats( merge_saige_results.out,
+								 merge_liftover_tables.out )
+		}
 	}
+
+
 
 //REGENIE
 	if(!params.disable_regenie){
@@ -153,5 +163,6 @@ workflow assoc{
 					   make_saige_covars.out.covars,
 					   regenie_step1.out,
 					   ch_pheno )
+		//TODO: lift_regenie_sumstats
 	}
 }

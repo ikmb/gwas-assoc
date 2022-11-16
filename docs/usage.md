@@ -4,13 +4,13 @@
 1. Run the [Quality Control Pipeline](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start) on the example first.
     - All files necessary for the association testing pipeline are automatically generated.
 2. Run the gwas-assoc pipeline with like so:
-   'nextflow run ikmb/gwas-assoc -r DSL2 \
+   ```nextflow run ikmb/gwas-assoc -r DSL2 \
     --input_imputed_glob "gwas-qc/example/output/Example/QCed/"'*.noATCG.vcf.gz'" \
     --fam "gwas-qc/example/output/Example/SNPQCII/Example_QCed.fam" \
     --collection_name "EXAMPLE" \
     --output "output/Example/Assoc" \
-    --build 37 \
-    --regenie'
+    --build 37 
+    ```
 
 ## How to Start
 
@@ -31,9 +31,9 @@ The following list covers all parameters that may be specified for the Associati
 
 ```
 --input_imputed_glob [glob]     [REQUIRED] A glob expression to specify the .vcf.gz files that should be used
-                                for association analysis
+                                    for association analysis
 --fam [file.fam]                [REQUIRED] A Plink-style FAM file that will be used to select a
-                                subset of samples from the provided VCFs
+                                    subset of samples from the provided VCFs
 --build [build]                 [REQUIRED] Genome build, 37 or 38
 --trait [type]                  [ADVISED] Trait type to analyze. May be 'binary' (default) or 'quantitative')
 --collection_name [name]        [ADVISED] Output filename prefix
@@ -41,10 +41,12 @@ The following list covers all parameters that may be specified for the Associati
 --more_covars [covars.txt]      [OPTIONAL] whitespace-separated list of covariates. See above.
 --more_covars_cols [COL1,COL2]  [OPTIONAL] comma-separated list of covar column header names
 --null_filter [filter]          [OPTIONAL] bcftools-style formatted INFO filter for generation of
-                                the SAIGE null model. Default: "R2>0.8"
--resume                         Restart where the pipeline was cancelled or aborted. May or may
-                                not work, depending on your filesystem specifics
+                                    the SAIGE null model. Default: "R2>0.8"
+-resume                         [OPTIONAL] Restart where the pipeline was cancelled or aborted. May or may
+                                    not work, depending on your filesystem specifics
 
---phenofile                     [OPTIONAL] Phenotype file for multiple phenotype/traits-testing with regenie. Tab separated file with columnsheader "FID IID Phenotype1 Phenotype2" Entries must be "0" for FID, "FID_IID" for IID and all phenotypes must be either binary or quantitaive, don't mix! Missing Samples will be ignored. Missing traits should contain "NA" as entry.
---additional_regenie_parameter  [OPTIONAL] Add additional parameters to step2 of regenie e.g. annotation and mask parameters for gene-based testing.
+--phenofile                     [OPTIONAL] Phenotype file for multiple phenotype/traits-testing with regenie. 
+                                    Tab separated file with columnsheader "FID IID Phenotype1 Phenotype2" Entries must be "0" for FID, "FID_IID" for IID and all phenotypes must be either binary or quantitaive, don't mix! Missing Samples will be ignored. Binary traits should be specified as control=1,case=2,missing=NA.
+--additional_regenie_parameter  [OPTIONAL] Add additional parameters to step2 of regenie e.g. annotation and mask parameters 
+                                    for gene-based testing.
 ```
