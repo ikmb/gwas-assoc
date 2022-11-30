@@ -10,8 +10,8 @@ process phenofile_from_fam {
    	
     shell:
     '''
-    #gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
-    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print $1"\t"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    #gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print $1"\t"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
     '''
 }
 
@@ -77,7 +77,6 @@ process regenie_step2 {
         path(phenofile)
     output:
         path("${params.collection_name}_regenie_firth*")
-    
     shell:
         outprefix = params.collection_name + '_regenie_firth'
 '''
@@ -89,7 +88,6 @@ else
     echo "Unsupported trait type. Only 'binary' and 'quantitative' traits are supported." >/dev/stderr
     exit 1
 fi
-
 
 sed 's/^chr//' !{bim.baseName}.bim >tmp.bim
 

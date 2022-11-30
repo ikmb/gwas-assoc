@@ -36,6 +36,7 @@ include {regenie_step1;
 
 include { prune_python_helper } from '../modules/python2.nf'
 include { lift_plink_sumstats;
+		//lift_regenie_sumstats;
 		  lift_saige_sumstats } from '../modules/liftsumstats.nf'
 
 //function definitions
@@ -50,16 +51,16 @@ def get_chromosome_code(filename) {
 	}
 
 
-	def check_fam_for_saige(file) {
-		def lines = file.readLines()
-    	    int x = 0
-        	int y = 0	
-		lines.each { String line ->
-  		if(line.split(" |\t")[5] == "2") x++
-  		if(line.split(" |\t")[5] == "1") y++
+def check_fam_for_saige(file) {
+	def lines = file.readLines()
+        int x = 0
+    	int y = 0	
+	lines.each { String line ->
+  	if(line.split(" |\t")[5] == "2") x++
+  	if(line.split(" |\t")[5] == "1") y++
 
-		}
- 		return(x > 50 && y > 50)
+	}
+ 	return(x > 50 && y > 50)
 
 	}
 
@@ -105,7 +106,7 @@ workflow assoc{
 	generate_pcs( prune.out )
 
 	make_saige_covars( generate_pcs.out,
-					   Channel.fromPath(params.fam) )
+					   Channel.fromPath(params.fam, checkIfExists: true ).ifEmpty { exit 1, "Cannot find fam file"} )
 //PLINK
 	plink_assoc( extract_dosage.out.combine(make_saige_covars.out.for_plink ) )
 
@@ -143,26 +144,30 @@ workflow assoc{
 		}
 	}
 
-
-
 //REGENIE
 	if(!params.disable_regenie){
 		if(params.phenofile){
 			//TODO: check if phenofile exist
-			ch_pheno = Channel.fromPath(params.phenofile)
+			ch_pheno = Channel.fromPath(params.phenofile, checkIfExists: true ).ifEmpty { exit 1, "Cannot find phenofile"}
 		}else{
-			phenofile_from_fam( Channel.fromPath(params.fam) )
+			phenofile_from_fam( Channel.fromPath(params.fam, checkIfExists: true ).ifEmpty { exit 1, "Cannot find fam file"} )
 			ch_pheno = phenofile_from_fam.out
 		}
-
+		//Regenie step1 should be run with less than 1mio SNPs, therefor we use the pruned plink-files
 		regenie_step1( prune.out,
 					   make_saige_covars.out.covars,
 					   ch_pheno )
 
-		regenie_step2( prune.out,
+		regenie_step2( merge_plink.out,
 					   make_saige_covars.out.covars,
 					   regenie_step1.out,
 					   ch_pheno )
 		//TODO: lift_regenie_sumstats
+		/*
+		if(params.ucsc_liftover != "" && !params.disable_liftover){
+			lift_regenie_sumstats( regenie_step2.out,
+								   merge_liftover_tables.out )
+		}
+		*/
 	}
 }

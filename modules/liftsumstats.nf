@@ -57,3 +57,39 @@ mv !{sumstats}.b37 !{sumstats}.lifted.${NEWBUILD}
 mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
 '''
 }
+
+
+/*
+TODO: Finish this process and create bin/stats2hg19_regenie.pl:
+*/
+/*
+process lift_regenie_sumstats {
+    tag "${params.collection_name}"
+    publishDir params.output, mode: 'copy'
+    label 'perl'
+
+    input:
+    file(sumstats)
+    file(lifttable)
+
+    output:
+    file("${sumstats}.lifted.*")
+
+shell:
+'''
+if [ "!{params.build}" == "37" ]; then
+    SUFFIX="hg38to37"
+    TEXT="hg38 to hg37"
+    NEWBUILD="38"
+else
+    SUFFIX="hg37to38"
+    TEXT="hg37 to hg38"
+    NEWBUILD="37"
+fi
+echo "Lifted from ${TEXT}. Liftover protocol: " >new-meta
+stats2hg19_regenie.pl !{lifttable} !{sumstats} >>new-meta
+mv !{sumstats}.b37 !{sumstats}.lifted.${NEWBUILD}
+mv new-meta !{sumstats}.lifted.${NEWBUILD}.txt
+'''
+}
+*/

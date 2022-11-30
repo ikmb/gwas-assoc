@@ -4,7 +4,8 @@
 1. Run the [Quality Control Pipeline](https://github.com/ikmb/gwas-qc/blob/master/Readme.md#quick-start) on the example first.
     - All files necessary for the association testing pipeline are automatically generated.
 2. Run the gwas-assoc pipeline with like so:
-   ```nextflow run ikmb/gwas-assoc -r DSL2 \
+   ```
+   nextflow run ikmb/gwas-assoc -r DSL2 \
     --input_imputed_glob "gwas-qc/example/output/Example/QCed/"'*.noATCG.vcf.gz'" \
     --fam "gwas-qc/example/output/Example/SNPQCII/Example_QCed.fam" \
     --collection_name "EXAMPLE" \
