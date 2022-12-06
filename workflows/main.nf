@@ -70,6 +70,8 @@ workflow assoc{
 	main:
 
 	option_check()
+	
+	//if(!params.fam){exit 1, "Cannot find fam file"}
 
 	params.fam_length=check_fam_for_saige( file(params.fam) )
 
