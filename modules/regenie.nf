@@ -10,8 +10,9 @@ process phenofile_from_fam {
    	
     shell:
     '''
-    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    #gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print "0\t"$1"_"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
     #gawk  'NR==1  {print "FID\tIID\tPhenotype"}{print $1"\t"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
+    gawk  'NR==1  {print "FID\tIID\tPhenotype"}{if($1!="0") {$2=$1"_"$2; $1="0";} print $1"\t"$2"\t"$6}' !{assocfam} > phenotype.txt #-v 'OFS= '  -F '\t'
     '''
 }
 
@@ -38,7 +39,7 @@ export R_LIBS_USER=/dev/null
 if [ "!{params.trait}" == "binary" ]; then
     TRAIT_ARGS="--bt --cc12"
 elif [ "!{params.trait}" == "quantitative" ]; then
-    TRAIT_ARGS="--qt --apply-rint"# --tauInit=!{params.tauInit}
+    TRAIT_ARGS="--qt --apply-rint"
 else
     echo "Unsupported trait type. Only 'binary' and 'quantitative' traits are supported." >/dev/stderr
     exit 1
@@ -47,6 +48,7 @@ fi
 regenie \
   --step 1 \
   --bed tmp \
+  --threads !{task.cpus} \
   --covarFile !{covars} \
   --covarCol PC{1:!{params.pca_dims}} \
   --phenoFile !{phenofile} \
@@ -83,7 +85,7 @@ process regenie_step2 {
 if [ "!{params.trait}" == "binary" ]; then
     TRAIT_ARGS="--bt --cc12"
 elif [ "!{params.trait}" == "quantitative" ]; then
-    TRAIT_ARGS="--qt --apply-rint"# --tauInit=!{params.tauInit}
+    TRAIT_ARGS="--qt --apply-rint"
 else
     echo "Unsupported trait type. Only 'binary' and 'quantitative' traits are supported." >/dev/stderr
     exit 1
@@ -97,6 +99,7 @@ ln -s !{fam} tmp.fam
 regenie \
   --step 2 \
   --bed tmp \
+  --threads !{task.cpus} \
   --covarFile !{covars} \
   --covarCol PC{1:!{params.pca_dims}} \
   --phenoFile !{phenofile} \

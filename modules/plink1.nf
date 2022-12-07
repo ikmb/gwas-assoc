@@ -1,26 +1,3 @@
-
-process merge_plink {
-    tag "${params.collection_name}"
-	 scratch params.scratch
-    publishDir params.output, mode: 'copy'
-    label 'plink'
-
-    input:
-    file(filelist)
-
-    output:
-    tuple file("${params.collection_name}.bed"), file("${params.collection_name}.bim"), file("${params.collection_name}.fam"), file("${params.collection_name}.log")// into for_prune //, for_liftover
-
-
-    shell:
-	'''
-		ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
-		MEM=!{task.memory.toMega()-1000}
-		FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | tail -n +1 | head -n 1)
-		plink --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
-	'''
-}
-
 process plink_assoc {
     tag "${params.collection_name}.${chrom}"
     label 'plink'

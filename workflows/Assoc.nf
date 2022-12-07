@@ -5,12 +5,12 @@ include { extract_dosage } from '../modules/extract_dosage.nf'
 include { generate_pcs } from '../modules/flashpca.nf'
 include { make_saige_covars } from '../modules/make_saige_covars.nf'
 
-include { merge_plink; 
-          plink_assoc;
+include { plink_assoc;
           merge_plink_lifted
         } from '../modules/plink1.nf'
 
 include { prune;
+		  merge_plink;
           make_plink } from '../modules/plink2.nf'
 
 include { liftover_pruned;
@@ -46,7 +46,7 @@ def get_file_details(filename) {
 	}
 
 def get_chromosome_code(filename) {
-    def m = filename =~ /\/([^\/]+).filtered.vcf.gz$/
+    def m = filename =~ /\/([^\/]+).ap_prf.vcf.gz$/
     return m[0][1]
 	}
 
@@ -102,8 +102,7 @@ workflow assoc{
 	prune( merge_plink.out,
 		   merge_r2.out,
 		   prune_python_helper.out )
-//LIFTOVER
-	liftover_pruned( prune.out )
+
 //FLASHPCA2
 	generate_pcs( prune.out )
 
@@ -117,6 +116,8 @@ workflow assoc{
 //LIFTOVER
 	if(params.ucsc_liftover != "" && !params.disable_liftover){
 		liftover( make_plink.out )
+
+		liftover_pruned( prune.out )
 
 		merge_plink_lifted( liftover.out.mergelifted )
 

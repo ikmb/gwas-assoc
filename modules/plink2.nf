@@ -61,3 +61,39 @@ awk '$1 !~ /^chr/ {$1="chr"$1} {$2=$1":"$4":"$6":"$5; print}' <old_bim >!{params
 # Might need some "chr" prefixing here
 '''
 }
+
+process merge_plink {
+    tag "${params.collection_name}"
+	scratch params.scratch
+    publishDir params.output, mode: 'copy'
+    label 'plink2'
+
+    input:
+    file(filelist)
+
+    output:
+    tuple file("${params.collection_name}.bed"), file("${params.collection_name}.bim"), file("${params.collection_name}.fam"), file("${params.collection_name}.log")// into for_prune //, for_liftover
+
+
+    shell:
+	'''
+		ls *.bed | xargs -i -- basename {} .bed | tail -n +2 >merge-list
+		MEM=!{task.memory.toMega()-1000}
+		FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | tail -n +1 | head -n 1)
+        #plink1.90 is the original, but fails when indel-ids get too long
+		#plink --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
+        plink2 --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --pmerge-list merge-list bfile --make-bed --keep-nosex --indiv-sort none --out !{params.collection_name}
+    '''
+}
+/*
+        if [[ $(wc -l <merge-list) >= 2 ]]; then
+            echo "There are merges to be done!\\n"
+            plink2 --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --pmerge-list merge-list bfile --make-bed --keep-nosex --indiv-sort none --out !{params.collection_name}
+
+                    else; then
+            echo "No merges to be !\\n"
+            cp $(ls *.bed | xargs -i -- basename {} .bed | tail -n +1 | head -n 1).bed ${params.collection_name}.bed
+            cp $(ls *.bed | xargs -i -- basename {} .bed | tail -n +1 | head -n 1).bim ${params.collection_name}.bim
+            cp $(ls *.bed | xargs -i -- basename {} .bed | tail -n +1 | head -n 1).fam ${params.collection_name}.fam
+        fi
+*/

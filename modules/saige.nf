@@ -60,11 +60,7 @@ shell:
 '''
 FIRSTPOS=$(head -n1 <!{chunk})
 LASTPOS=$(tail -n1 <!{chunk})
-#if [ "!{params.chrchr}" = "0" ]; then
-    CHR=!{chrom}
-#else
-#    CHR=chr!{chrom}
-#fi
+
 FIELD="DS"
 AVAILABLE=$(cat !{field})
 # Choose between DS and GT, prefer DS over GT

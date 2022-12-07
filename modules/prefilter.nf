@@ -14,7 +14,7 @@ process prefilter {
     each path(inc_fam)
 
     output:
-    tuple path("*.filtered.vcf.gz"), path("*.filtered.vcf.gz.tbi"), val(filetype) //into for_extract_chromosome_code //for_split_vcf, for_extract_dosage, for_gen_r2, for_plink_imp
+    tuple path("*.ap_prf.vcf.gz"), path("*.ap_prf.vcf.gz.tbi"), val(filetype) //into for_extract_chromosome_code //for_split_vcf, for_extract_dosage, for_gen_r2, for_plink_imp
 
 shell:
 '''
@@ -34,12 +34,15 @@ CHROM=$(cat chrom)
 # Ok, we need to remove some samples. tabix afterwards
 # If there's nothing to remove, skip this time-consuming step.
 if [ "$REMOVE_COUNT" != "0" ]; then
-    bcftools view --threads !{task.cpus} -S keep-samples !{vcf} -o $CHROM.filtered.vcf.gz -O z
-    tabix $CHROM.filtered.vcf.gz
+    bcftools view --threads !{task.cpus} -S keep-samples !{vcf} -o $CHROM.ap_prf.vcf.gz -O z
+    tabix $CHROM.ap_prf.vcf.gz
 else
-    ln -s !{vcf} $CHROM.filtered.vcf.gz
-    ln -s !{vcf}.tbi $CHROM.filtered.vcf.gz.tbi
+    ln -s !{vcf} $CHROM.ap_prf.vcf.gz
+    ln -s !{vcf}.tbi $CHROM.ap_prf.vcf.gz.tbi
 fi
 
 '''
 }
+//TODO: include maf filter for prefiltering step?
+//Like so: bcftools view -q 0.01:minor
+//-i 'MAF>0.01'

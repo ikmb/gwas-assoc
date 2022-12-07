@@ -23,7 +23,7 @@ run_name = ( params.run_name == false) ? "${workflow.sessionId}" : "${params.run
 
 
 
-include { assoc } from './workflows/main' params(params)
+include { assoc } from './workflows/Assoc' params(params)
 
 workflow {
 

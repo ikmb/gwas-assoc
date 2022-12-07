@@ -35,7 +35,7 @@ The following list covers all parameters that may be specified for the Associati
                                     for association analysis
 --fam [file.fam]                [REQUIRED] A Plink-style FAM file that will be used to select a
                                     subset of samples from the provided VCFs
---build [build]                 [REQUIRED] Genome build, 37 or 38
+--build [build]                 [REQUIRED] Genome build, 37 (default) or 38
 --trait [type]                  [ADVISED] Trait type to analyze. May be 'binary' (default) or 'quantitative')
 --collection_name [name]        [ADVISED] Output filename prefix
 --output [directory]            [ADVISED] Output directory
