@@ -137,10 +137,10 @@ wait
 <new-pos sort | uniq -d | cut -f1 -d" ">duplicates &
 wait
 cat chromosome-switchers >>duplicates
-/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --memory $MEM --exclude duplicates --make-pgen --out no-duplicates
-/opt/plink2 --pfile no-duplicates --memory $MEM --exclude unmapped-variants --update-map new-pos --make-pgen --sort-vars  --out ${BASENAME}
-/opt/plink2 --pfile ${BASENAME} --memory $MEM --make-bed --out ${BASENAME}.tmp
-plink --bfile ${BASENAME}.tmp --memory $MEM --merge-x no-fail --make-bed --out ${BASENAME}
+/opt/plink2 --bed !{bed} --bim !{bim} --fam !{fam} --memory $MEM --exclude duplicates --keep-nosex --make-pgen --out no-duplicates
+/opt/plink2 --pfile no-duplicates --memory $MEM --exclude unmapped-variants --update-map new-pos --keep-nosex --make-pgen --sort-vars  --out ${BASENAME}
+/opt/plink2 --pfile ${BASENAME} --memory $MEM --keep-nosex --make-bed --out ${BASENAME}.tmp
+plink --bfile ${BASENAME}.tmp --memory $MEM --merge-x no-fail --allow-no-sex --make-bed --out ${BASENAME}
 mv ${BASENAME}.bim tmp
 gawk '{$2="chr"$1":"$4":"$6":"$5; print $0}' tmp >${BASENAME}.bim
 mv postlift.bed postlift.!{chrom}

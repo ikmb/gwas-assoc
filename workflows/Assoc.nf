@@ -119,7 +119,7 @@ workflow assoc{
 
 		liftover_pruned( prune.out )
 
-		merge_plink_lifted( liftover.out.mergelifted )
+		merge_plink_lifted( liftover.out.mergelifted.collect() )
 
 		merge_liftover_tables( liftover.out.for_merge_tables.collect() )
 
