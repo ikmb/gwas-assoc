@@ -58,6 +58,8 @@ process saige_assoc {
     
 shell:
 '''
+CHR=!{chrom}
+
 FIRSTPOS=$(head -n1 <!{chunk})
 LASTPOS=$(tail -n1 <!{chunk})
 
