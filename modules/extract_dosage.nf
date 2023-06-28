@@ -108,12 +108,15 @@ BEGIN{
 }
 AwkProg2
 (<$FIFO tail -n +2 | $AWK '{print $1, $3, 0, $2}' | uniq) >$TARGET.map &
+
 # unpack vcf.gz only once
 $BGZIP -c -d $VCF \
     | $AWK -f awkprog2.awk \
     | tee $FIFO \
     | gzip >$TARGET.gz
+
 wait
+
 rm -f $FIFO
 '''
 }

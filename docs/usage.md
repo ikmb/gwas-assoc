@@ -50,4 +50,5 @@ The following list covers all parameters that may be specified for the Associati
                                     Tab separated file with columnsheader "FID IID Phenotype1 Phenotype2" Entries must be "0" for FID, "FID_IID" for IID and all phenotypes must be either binary or quantitaive, don't mix! Missing Samples will be ignored. Binary traits should be specified as control=1,case=2,missing=NA.
 --additional_regenie_parameter  [OPTIONAL] Add additional parameters to step2 of regenie e.g. annotation and mask parameters 
                                     for gene-based testing.
+--disable_liftover              [OPTIONAL] Will deactivate all liftover related steps to get the results in the other genome build 38 or 37.
 ```

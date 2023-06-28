@@ -36,6 +36,16 @@ ln -s !{bed} tmp.bed
 ln -s !{fam} tmp.fam
 
 export R_LIBS_USER=/dev/null
+
+if [ "!{params.build}" == "37" ]; then
+    BUILD_ARGS="--par-region hg19"
+elif [ "!{params.build}" == "38" ] then
+    BUILD_ARGS="--par-region hg38"
+else
+    echo "Unsupported genome build." >/dev/stderr
+    exit 1
+fi
+
 if [ "!{params.trait}" == "binary" ]; then
     TRAIT_ARGS="--bt --cc12"
 elif [ "!{params.trait}" == "quantitative" ]; then
@@ -54,6 +64,7 @@ regenie \
   --phenoFile !{phenofile} \
   --use-relative-path \
   --bsize 100 \
+  $BUILD_ARGS \
   $TRAIT_ARGS \
   --lowmem \
   --loocv	\
@@ -82,6 +93,15 @@ process regenie_step2 {
     shell:
         outprefix = params.collection_name + '_regenie_firth'
 '''
+if [ "!{params.build}" == "37" ]; then
+    BUILD_ARGS="--par-region hg19"
+elif [ "!{params.build}" == "38" ] then
+    BUILD_ARGS="--par-region hg38"
+else
+    echo "Unsupported genome build." >/dev/stderr
+    exit 1
+fi
+
 if [ "!{params.trait}" == "binary" ]; then
     TRAIT_ARGS="--bt --cc12"
 elif [ "!{params.trait}" == "quantitative" ]; then
@@ -105,6 +125,7 @@ regenie \
   --phenoFile !{phenofile} \
   --bsize 200 \
   $TRAIT_ARGS \
+  $BUILD_ARGS \
   --firth --approx \
   --pThresh 0.01 \
   --loocv	\

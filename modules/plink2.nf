@@ -82,7 +82,7 @@ process merge_plink {
 		FIRSTNAME=$(ls *.bed | xargs -i -- basename {} .bed | tail -n +1 | head -n 1)
         #plink1.90 is the original, but fails when indel-ids get too long
 		#plink --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --merge-list merge-list --make-bed --allow-no-sex --indiv-sort none --keep-allele-order --out !{params.collection_name}
-        plink2 --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --pmerge-list merge-list bfile --make-bed --keep-nosex --indiv-sort none --output-chr 26 --out !{params.collection_name}
+        plink2 --bfile $FIRSTNAME --threads !{task.cpus} --memory $MEM --pmerge-list merge-list bfile --make-bed --keep-nosex --indiv-sort none --chr 1-22, X, MT, par1, par2 --output-chr 26 --out !{params.collection_name}
         #trying to remake the plink1.9 output with parameter --output-chr 26
     '''
 }

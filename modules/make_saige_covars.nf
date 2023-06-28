@@ -51,7 +51,7 @@ mv new-fam !{params.collection_name}.double-id.fam
 # Merge both, replace space runs with single tabs for SAIGE
 touch covars-column
 if [ ! -d "!{params.more_covars}" ]; then
-    echo PC{1..10} ,sex,age,bmi,PC1_diet_uw,PC2_diet_uw,PC3_diet_uw,PC4_diet_uw,PC5_diet_uw,PC6_diet_uw,PC7_diet_uw,PC8_diet_uw,PC9_diet_uw,PC10_diet_uw | sed 's/\\ ,/\\,/g' | tr ' ' , >!{params.collection_name}.covar_cols
+    echo PC{1..10}, !{params.more_covars_cols} | sed 's/\\ ,/\\,/g' | tr ' ' ,  | sed 's/\\,\\,/\\,/g' >!{params.collection_name}.covar_cols
 else
     echo PC{1..!{params.pca_dims}} | tr ' ' , >!{params.collection_name}.covar_cols
 fi
